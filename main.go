@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -420,9 +421,7 @@ func main() {
 			res := regexp.MustCompile(`"[^"]*"|\S+`)
 			secure.SetPassword(res.FindAllString(strings.Join(cmdArgs, " "), -1)[0])
 		case "CLS":
-			c := exec.Command("cmd", "/c", "cls")
-			c.Stdout = os.Stdout
-			c.Run()
+			clearScreen()
 		case "\\HELP", "?":
 			fmt.Println("Available commands:")
 
@@ -452,4 +451,18 @@ func main() {
 
 		fmt.Printf(logger.Bold + logger.Cyan + "[Cache] Enter command: " + logger.Reset)
 	}
+}
+
+func clearScreen() {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "cls")
+	default:
+		cmd = exec.Command("clear")
+	}
+
+	cmd.Stdout = os.Stdout
+	_ = cmd.Run()
 }
