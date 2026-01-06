@@ -29,7 +29,7 @@ type CacheData struct {
 	Requests  int
 	TimeStamp time.Time
 	TTK       *time.Timer
-	TTL       time.Time
+	TTL       *time.Time
 }
 
 type Cache struct {
@@ -50,7 +50,7 @@ func (c *Cache) ResetCache() {
 	defer c.mu.Unlock()
 
 	c.data = make(map[string]*CacheData)
-	c.mode = ReadOnly
+	c.mode = ReadWrite
 }
 
 func (c *Cache) WithLock(fn func()) {
@@ -113,7 +113,7 @@ func (c *Cache) SetPartialUnsafe(k string, nD CacheDataUpdate) {
 		cd.TTK = nD.TTK
 	}
 	if nD.TTL != nil {
-		cd.TTL = *nD.TTL
+		cd.TTL = nD.TTL
 	}
 }
 

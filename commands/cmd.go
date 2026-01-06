@@ -103,31 +103,36 @@ func GET(c *storage.Cache, ks []string) {
 
 	c.WithLock(func() {
 		for _, k := range ks {
-			if ks[0] == "*" {
-				if len(ks) == 1 {
-					for k := range c.GetData() {
-						res = append(res, k)
+			if cachedData, exists := c.GetUnsafe(k); exists {
+				cachedData.Requests++
+
+				var cV interface{}
+
+				m, ok := cachedData.Value.(map[string]struct{})
+				if ok {
+					tS := make([]string, 0, len(m))
+
+					for k := range m {
+						tS = append(tS, k)
 					}
+
+					cV = tS
 				} else {
-					logger.Error("Invalid syntax")
+					cV = cachedData.Value
+				}
+
+				if len(ks) == 1 {
+					fmt.Println(cV)
 					return
+				} else {
+					res = append(res, cV)
 				}
 			} else {
-				if cachedData, exists := c.GetUnsafe(k); exists {
-					cachedData.Requests++
-					if len(ks) == 1 {
-						fmt.Println(cachedData.Value)
-						return
-					} else {
-						res = append(res, cachedData.Value)
-					}
+				if len(k) == 1 {
+					fmt.Println(nil)
+					return
 				} else {
-					if len(k) == 1 {
-						fmt.Println(nil)
-						return
-					} else {
-						res = append(res, nil)
-					}
+					res = append(res, nil)
 				}
 			}
 		}
@@ -137,14 +142,14 @@ func GET(c *storage.Cache, ks []string) {
 
 // Remove any type of data from the cache
 func DEL(c *storage.Cache, k string) {
-	c.WithLock(func() {
-		if k == "*" {
-			c.ResetCache()
-			logger.Success("OK")
-			return
-		}
+	if k == "*" {
+		c.ResetCache()
+		logger.Success("OK")
+		return
+	}
 
-		if _, exists := c.GetSafe(k); exists {
+	c.WithLock(func() {
+		if _, exists := c.GetUnsafe(k); exists {
 			delete(c.GetData(), k)
 		} else {
 			logger.Error("Can`t find %v in memory", k)
@@ -242,15 +247,15 @@ func TTK(c *storage.Cache, k, t string) {
 	c.WithLock(func() {
 
 		if k == "*" {
-			logger.Success("OK")
-
 			time.AfterFunc(time.Duration(tInt)*time.Second, func() {
 				c.ResetCache()
 			})
+
+			logger.Success("OK")
 			return
 		}
 
-		cacheData, exists := c.GetSafe(k)
+		cacheData, exists := c.GetUnsafe(k)
 
 		if !exists {
 			logger.Error("Can`t find %v in memory", k)
@@ -268,7 +273,10 @@ func TTK(c *storage.Cache, k, t string) {
 			}
 		})
 
-		cacheData.TTL = time.Now().Add(durationOf)
+		t := time.Now().Add(durationOf)
+		cacheData.TTL = &t
+
+		logger.Success("OK")
 	})
 }
 
@@ -298,7 +306,7 @@ func TTL(c *storage.Cache, k string) {
 				return
 			}
 			// fmt.Println(int(time.Since(dataCache.TTL).Seconds()) * -1)
-			fmt.Println(int(time.Until(dataCache.TTL).Seconds()) * -1)
+			fmt.Println(int(time.Until(*dataCache.TTL).Seconds()))
 		} else {
 			logger.Error("Can`t find %v in memory", k)
 			return
@@ -419,4 +427,58 @@ func KEYS(c *storage.Cache, args []string) {
 			fmt.Println(getKeysByPattern(c.GetData(), args[0], d))
 		})
 	}
+}
+
+func RENAME(c *storage.Cache, sK, tK string) {
+	c.WithLock(func() {
+		sCd, exists := c.GetUnsafe(sK)
+		if !exists {
+			logger.Error("can`t find %v in memory", sK)
+			return
+		}
+
+		_, exists = c.GetUnsafe(tK)
+		if exists {
+			logger.Error("%v already exists", tK)
+			return
+		}
+
+		d := c.GetData()
+
+		delete(d, sK)
+		c.SetUnsafe(tK, sCd)
+
+		logger.Success("OK")
+	})
+}
+
+func INFO(c *storage.Cache, k string) {
+	c.WithRWLock(func() {
+		cd, exists := c.GetUnsafe(k)
+		if !exists {
+			logger.Error("Can`t find %v in memory", k)
+			return
+		}
+
+		fmt.Println("[INFO]:")
+		fmt.Println("	{")
+		fmt.Println("		key:", k)
+		fmt.Println("		value:", cd.Value)
+		fmt.Println("		requests:", cd.Requests)
+		fmt.Println("		created_at:", cd.TimeStamp)
+
+		if cd.TTL != nil {
+			ttl := time.Until(*cd.TTL)
+			if ttl < 0 {
+				ttl = 0
+			}
+
+			fmt.Println("		ttl:", int(ttl.Seconds()))
+			fmt.Println("		expires_at:", cd.TTL.Format(time.RFC3339))
+		} else {
+			fmt.Println("		ttl: -1")
+		}
+
+		fmt.Println("	}")
+	})
 }

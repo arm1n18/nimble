@@ -166,6 +166,68 @@ func main() {
 			secure.ReadOnlyMiddleware(c, func() {
 				cmd.HSET(c, cmdArgs[0], matches[1:])
 			})
+		case "SADD":
+			if len(cmdArgs[1:]) == 0 {
+				logger.Error("Invalid syntax")
+				break
+			}
+			res := regexp.MustCompile(`"[^"]*"|\S+`)
+			matches := res.FindAllString(strings.Join(cmdArgs, " "), -1)
+			secure.ReadOnlyMiddleware(c, func() {
+				cmd.SADD(c, cmdArgs[0], matches[1:])
+			})
+		case "SREM":
+			if len(cmdArgs[1:]) == 0 {
+				logger.Error("Invalid syntax")
+				break
+			}
+			res := regexp.MustCompile(`"[^"]*"|\S+`)
+			matches := res.FindAllString(strings.Join(cmdArgs, " "), -1)
+			secure.ReadOnlyMiddleware(c, func() {
+				cmd.SREM(c, cmdArgs[0], matches[1:])
+			})
+		case "SLEN":
+			if len(cmdArgs) > 1 {
+				logger.Error("Invalid syntax")
+				break
+			}
+			cmd.SLEN(c, cmdArgs[0])
+		case "ZADD":
+			if len(cmdArgs) != 3 {
+				logger.Error("Ivalid syntax")
+				break
+			}
+			cmd.ZADD(c, cmdArgs[0], cmdArgs[1], cmdArgs[2])
+		case "ZRANGEBYSCORE":
+			if len(cmdArgs) != 3 {
+				logger.Error("Ivalid syntax")
+				break
+			}
+			cmd.ZRANGEBYSCORE(c, cmdArgs[0], cmdArgs[1], cmdArgs[2])
+		case "ZREM":
+			if len(cmdArgs) != 2 {
+				logger.Error("Invalid syntax")
+				break
+			}
+			cmd.ZREM(c, cmdArgs[0], cmdArgs[1])
+		case "SCORE":
+			if len(cmdArgs) != 2 {
+				logger.Error("Invalid syntax")
+				break
+			}
+			cmd.SCORE(c, cmdArgs[0], cmdArgs[1])
+		case "LSCORE":
+			if len(cmdArgs) < 2 {
+				logger.Error("Invalid syntax")
+				break
+			}
+			cmd.LSCORE(c, cmdArgs[0], cmdArgs[1:])
+		case "SMEMBERS":
+			if len(cmdArgs) > 1 {
+				logger.Error("Invalid syntax")
+				break
+			}
+			cmd.SMEMBERS(c, cmdArgs[0])
 		case "HGET":
 			if len(cmdArgs[1:]) == 0 {
 				logger.Error("Invalid syntax")
@@ -211,6 +273,14 @@ func main() {
 			}
 			secure.ReadOnlyMiddleware(c, func() {
 				cmd.COPY(c, cmdArgs[0], cmdArgs[1])
+			})
+		case "RENAME":
+			if len(cmdArgs) != 2 {
+				logger.Error("Invalid syntax")
+				break
+			}
+			secure.ReadOnlyMiddleware(c, func() {
+				cmd.RENAME(c, cmdArgs[0], cmdArgs[1])
 			})
 		case "LSET":
 			if len(cmdArgs) < 2 {
@@ -398,12 +468,36 @@ func main() {
 				break
 			}
 			cmd.LCONTAINS(c, cmdArgs[0], cmdArgs[1:])
+		case "SCONTAINS":
+			if len(cmdArgs[1:]) == 0 {
+				logger.Error("Invalid syntax")
+				break
+			}
+			cmd.SCONTAINS(c, cmdArgs[0], cmdArgs[1:])
+		case "LSCONTAINS":
+			if len(cmdArgs[1:]) == 0 {
+				logger.Error("Invalid syntax")
+				break
+			}
+			cmd.LSCONTAINS(c, cmdArgs[0], cmdArgs[1:])
+		case "INDEXOF":
+			if len(cmdArgs[1:]) == 0 {
+				logger.Error("Invalid syntax")
+				break
+			}
+			cmd.INDEXOF(c, cmdArgs[0], cmdArgs[1])
 		case "TYPE":
 			if len(cmdArgs) > 1 {
 				logger.Error("Invalid syntax")
 				break
 			}
 			cmd.TYPE(c, cmdArgs[0])
+		case "INFO":
+			if len(cmdArgs) > 1 {
+				logger.Error("Invalid syntax")
+				break
+			}
+			cmd.INFO(c, cmdArgs[0])
 		case "MODE":
 			if len(cmdArgs) == 0 {
 				fmt.Println(c.GetMode())

@@ -322,28 +322,30 @@ func SRANGE(c *storage.Cache, aN string, s []string) {
 func CONTAINS(c *storage.Cache, aN string, ks []string) {
 	var res int
 
-	cd, exists := c.GetSafe(aN)
-	if !exists {
-		logger.Error("can`t find %v in memory", aN)
-		return
-	}
+	c.WithRWLock(func() {
+		cd, exists := c.GetUnsafe(aN)
+		if !exists {
+			logger.Error("can`t find %v in memory", aN)
+			return
+		}
 
-	// CHECK
-	cd.Requests++
+		// CHECK
+		cd.Requests++
 
-	s, ok := cd.Value.([]string)
-	if !ok {
-		logger.Error("%s isn`t array", aN)
-		return
-	}
+		s, ok := cd.Value.([]string)
+		if !ok {
+			logger.Error("%s isn`t array", aN)
+			return
+		}
 
-	for _, v := range s {
-		for _, k := range ks {
-			if k == v {
-				res++
+		for _, v := range s {
+			for _, k := range ks {
+				if k == v {
+					res++
+				}
 			}
 		}
-	}
+	})
 
 	fmt.Println(res)
 }
@@ -351,36 +353,67 @@ func CONTAINS(c *storage.Cache, aN string, ks []string) {
 // Check if the values exist in the array and return array
 func LCONTAINS(c *storage.Cache, aN string, ks []string) {
 	res := make([]int, len(ks))
-
-	cd, exists := c.GetSafe(aN)
-	if !exists {
-		logger.Error("can`t find %v in memory", aN)
-		return
-	}
-
-	// CHECK
-	cd.Requests++
-
-	s, ok := cd.Value.([]string)
-	if !ok {
-		logger.Error("%s isn`t array", aN)
-		return
-	}
-
-	tM := make(map[string]struct{})
-	for _, v := range s {
-		tM[v] = struct{}{}
-	}
-
-	for i, k := range ks {
-		if _, exists := tM[k]; exists {
-			res[i] = 1
-		} else {
-			res[i] = 0
+	c.WithRWLock(func() {
+		cd, exists := c.GetUnsafe(aN)
+		if !exists {
+			logger.Error("can`t find %v in memory", aN)
+			return
 		}
-	}
+
+		// CHECK
+		cd.Requests++
+
+		s, ok := cd.Value.([]string)
+		if !ok {
+			logger.Error("%s isn`t array", aN)
+			return
+		}
+
+		tM := make(map[string]struct{})
+		for _, v := range s {
+			tM[v] = struct{}{}
+		}
+
+		for i, k := range ks {
+			if _, exists := tM[k]; exists {
+				res[i] = 1
+			} else {
+				res[i] = 0
+			}
+		}
+	})
 
 	fmt.Println(res)
+}
+
+// Return index of target value in array
+func INDEXOF(c *storage.Cache, aN, k string) {
+	c.WithRWLock(func() {
+		cd, exists := c.GetUnsafe(aN)
+		if !exists {
+			logger.Error("can`t find %v in memory", aN)
+			return
+		}
+
+		cd.Requests++
+
+		s, ok := cd.Value.([]string)
+		if !ok {
+			logger.Error("%s isn`t array", aN)
+			return
+		}
+
+		tI := -1
+
+		for i, v := range s {
+			if v == k {
+				tI = i
+				break
+			}
+		}
+
+		fmt.Println(tI)
+	})
 }
 
 // Get length of the array
