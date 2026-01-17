@@ -12,11 +12,11 @@ import (
 )
 
 func getKeysByPattern(m map[string]*storage.CacheData, pattern string, lim int) []string {
-	var ks []string
+	var kvs []string
 
 	symbol, ok := utils.GetPatternSymbol(pattern)
 	if !ok {
-		return ks
+		return kvs
 	}
 
 	switch symbol {
@@ -29,8 +29,8 @@ func getKeysByPattern(m map[string]*storage.CacheData, pattern string, lim int) 
 				}
 
 				if match {
-					ks = append(ks, k)
-					if lim > 0 && len(ks) >= lim {
+					kvs = append(kvs, k)
+					if lim > 0 && len(kvs) >= lim {
 						break
 					}
 				}
@@ -45,8 +45,8 @@ func getKeysByPattern(m map[string]*storage.CacheData, pattern string, lim int) 
 				}
 
 				if match && len(pattern) == len(k) {
-					ks = append(ks, k)
-					if lim > 0 && len(ks) >= lim {
+					kvs = append(kvs, k)
+					if lim > 0 && len(kvs) >= lim {
 						break
 					}
 				}
@@ -54,19 +54,43 @@ func getKeysByPattern(m map[string]*storage.CacheData, pattern string, lim int) 
 		}
 	}
 
-	return ks
+	return kvs
 }
 
 // Store data of string type in the cache
-func SET(c *storage.Cache, ks []string) {
-	if len(ks)%2 == 0 && len(ks) != 0 {
+func SET(c *storage.Cache, k, v string) {
+	c.WithLock(func() {
+		if k == "" {
+			logger.Error("Key cannot be empty")
+			return
+		}
+
+		if k == "*" {
+			logger.Error("Can`t use * as key")
+			return
+		}
+
+		c.SetUnsafe(k, &storage.CacheData{
+			Value:     v,
+			Type:      storage.String,
+			Requests:  1,
+			CreatedAt: time.Now(),
+		})
+	})
+
+	logger.Success("OK")
+}
+
+// Store data of string type in the cache
+func MSET(c *storage.Cache, kvs ...string) {
+	if len(kvs)%2 == 0 && len(kvs) != 0 {
 		// if ok := removeQuotes(&s, 1, 1); !ok {
 		// 	return
 		// }
 
 		c.WithLock(func() {
-			for i := 0; i < len(ks); i += 2 {
-				k, v := ks[i], ks[i+1]
+			for i := 0; i < len(kvs); i += 2 {
+				k, v := kvs[i], kvs[i+1]
 
 				if k == "" {
 					logger.Error("Key cannot be empty")
@@ -80,8 +104,9 @@ func SET(c *storage.Cache, ks []string) {
 
 				c.SetUnsafe(k, &storage.CacheData{
 					Value:     v,
+					Type:      storage.String,
 					Requests:  1,
-					TimeStamp: time.Now(),
+					CreatedAt: time.Now(),
 				})
 			}
 		})
@@ -93,35 +118,69 @@ func SET(c *storage.Cache, ks []string) {
 	logger.Success("OK")
 }
 
-// Get any type of data from the cache
-func GET(c *storage.Cache, ks []string) {
+// Get string type of data from the cache
+func GET(c *storage.Cache, k string) {
+	c.WithLock(func() {
+		if cd, exists := c.GetUnsafe(k); exists {
+			cd.Requests++
+
+			var cV interface{}
+
+			// m, ok := cd.Value.(map[string]struct{})
+			// if ok {
+			// 	tS := make([]string, 0, len(m))
+
+			// 	for k := range m {
+			// 		tS = append(tS, k)
+			// 	}
+
+			// 	cV = tS
+			// } else {
+			// 	cV = cd.Value
+			// }
+
+			cV = cd.Value
+
+			fmt.Println(cV)
+			return
+		} else {
+			fmt.Println(nil)
+			return
+		}
+	})
+}
+
+// Get string type of data from the cache
+func MGET(c *storage.Cache, kvs ...string) {
 	var res []interface{}
 
-	if len(ks) != 1 {
-		res = make([]interface{}, 0, len(ks))
+	if len(kvs) != 1 {
+		res = make([]interface{}, 0, len(kvs))
 	}
 
 	c.WithLock(func() {
-		for _, k := range ks {
-			if cachedData, exists := c.GetUnsafe(k); exists {
-				cachedData.Requests++
+		for _, k := range kvs {
+			if cd, exists := c.GetUnsafe(k); exists {
+				cd.Requests++
 
 				var cV interface{}
 
-				m, ok := cachedData.Value.(map[string]struct{})
-				if ok {
-					tS := make([]string, 0, len(m))
+				// m, ok := cd.Value.(map[string]string{})
+				// if ok {
+				// 	tS := make([]string, 0, len(m))
 
-					for k := range m {
-						tS = append(tS, k)
-					}
+				// 	for k := range m {
+				// 		tS = append(tS, k)
+				// 	}
 
-					cV = tS
-				} else {
-					cV = cachedData.Value
-				}
+				// 	cV = tS
+				// } else {
+				// 	cV = cd.Value
+				// }
 
-				if len(ks) == 1 {
+				cV = cd.Value
+
+				if len(kvs) == 1 {
 					fmt.Println(cV)
 					return
 				} else {
@@ -163,44 +222,16 @@ func DEL(c *storage.Cache, k string) {
 // Copy data from one structure to another
 func COPY(c *storage.Cache, k1, k2 string) {
 	c.WithLock(func() {
-		cd, exists := c.GetSafe(k1)
+		cd, exists := c.GetUnsafe(k1)
 		if !exists {
 			logger.Error("Can`t find %v in memory", k1)
 			return
 		}
 
-		c.SetPartialUnsafe(k2, storage.CacheDataUpdate{Value: cd.Value})
+		c.SetPartialUnsafe(k2, storage.CacheDataUpdate{Value: &cd.Value, Type: &cd.Type})
 
 		logger.Success("OK")
 	})
-}
-
-// Store data of number type in the cache
-func NUMSET(c *storage.Cache, d []string) {
-	if len(d)%2 == 0 && len(d) != 0 {
-		c.WithLock(func() {
-			for i := 0; i < len(d); i += 2 {
-				k, dStr := d[i], d[i+1]
-
-				digit, err := strconv.ParseFloat(dStr, 64)
-				if err != nil {
-					logger.Error("Can`t parse number")
-					return
-				}
-
-				c.SetUnsafe(k, &storage.CacheData{
-					Value:     digit,
-					Requests:  1,
-					TimeStamp: time.Now(),
-				})
-			}
-		})
-	} else {
-		logger.Error("Not enough values")
-		return
-	}
-
-	logger.Success("OK")
 }
 
 // Show all the keys
@@ -237,44 +268,45 @@ Example:
 
   - Explanation: Sets the key "session:123" to expire in 360 seconds (6 minutes)
 */
-func TTK(c *storage.Cache, k, t string) {
-	tInt, err := strconv.Atoi(t)
+func TTK(c *storage.Cache, k, v string) {
+	t, err := strconv.Atoi(v)
 	if err != nil {
 		logger.Error("Can`t parse number")
 		return
 	}
 
+	if t < -1 {
+		logger.Error("TTL must be >= -1")
+		return
+	}
+
+	var expiresAt *time.Time
+	if t != -1 {
+		et := time.Now().Add(time.Duration(t) * time.Second)
+		expiresAt = &et
+	}
+
 	c.WithLock(func() {
 
 		if k == "*" {
-			time.AfterFunc(time.Duration(tInt)*time.Second, func() {
-				c.ResetCache()
-			})
-
+			for key := range c.GetData() {
+				c.SetPartialUnsafe(key, storage.CacheDataUpdate{
+					ExpiresAt: expiresAt,
+				})
+			}
 			logger.Success("OK")
 			return
 		}
 
-		cacheData, exists := c.GetUnsafe(k)
-
+		_, exists := c.GetUnsafe(k)
 		if !exists {
 			logger.Error("Can`t find %v in memory", k)
 			return
 		}
 
-		durationOf := time.Duration(tInt) * time.Second
-
-		cacheData.TTK = time.AfterFunc(durationOf, func() {
-			if _, exists := c.GetSafe(k); exists {
-				delete(c.GetData(), k)
-			} else {
-				logger.Error("Can`t find %v in memory", k)
-				return
-			}
+		c.SetPartialUnsafe(k, storage.CacheDataUpdate{
+			ExpiresAt: expiresAt,
 		})
-
-		t := time.Now().Add(durationOf)
-		cacheData.TTL = &t
 
 		logger.Success("OK")
 	})
@@ -301,12 +333,12 @@ func TTL(c *storage.Cache, k string) {
 	c.WithRWLock(func() {
 
 		if dataCache, exists := c.GetSafe(k); exists {
-			if dataCache.TTL.IsZero() {
-				fmt.Println(-1) // -1 TTL means that data has no TTK
+			if dataCache.ExpiresAt == nil {
+				fmt.Println(-1) // -1 means that data has no TTK
 				return
 			}
 			// fmt.Println(int(time.Since(dataCache.TTL).Seconds()) * -1)
-			fmt.Println(int(time.Until(*dataCache.TTL).Seconds()))
+			fmt.Println(int(time.Until(*dataCache.ExpiresAt).Seconds()))
 		} else {
 			logger.Error("Can`t find %v in memory", k)
 			return
@@ -318,7 +350,7 @@ func TTL(c *storage.Cache, k string) {
 Count how many keys exist in the cache
 
 Description:
-Checks one or more keys in the cache and returns the total number of kesy that exist.
+Checkvs one or more keys in the cache and returns the total number of kesy that exist.
 
 Example:
 
@@ -328,13 +360,13 @@ Example:
 
   - Explanation: (KEY_1 exists, KEY_2 exists, KEY_0 does not exist)
 */
-func EXISTS(c *storage.Cache, ks []string) {
+func EXISTS(c *storage.Cache, kvs ...string) {
 	var res int
 
 	c.WithRWLock(func() {
 		cd := c.GetData()
 
-		for _, k := range ks {
+		for _, k := range kvs {
 			if _, exists := cd[k]; exists {
 				res++
 			}
@@ -348,7 +380,7 @@ func EXISTS(c *storage.Cache, ks []string) {
 Check if the keys exist and return array.
 
 Description:
-Checks one or more keys in the cache and returns an array of integers.
+Checkvs one or more keys in the cache and returns an array of integers.
 
 Behavior:
   - For each key provided:
@@ -363,13 +395,13 @@ Example:
 
   - Explanation: (KEY_1 exists, KEY_2 exists, KEY_0 does not exist)
 */
-func LEXISTS(c *storage.Cache, ks []string) {
-	res := make([]int, len(ks))
+func LEXISTS(c *storage.Cache, kvs ...string) {
+	res := make([]int, len(kvs))
 
 	c.WithRWLock(func() {
 		cd := c.GetData()
 
-		for i, k := range ks {
+		for i, k := range kvs {
 			if _, exists := cd[k]; exists {
 				res[i] = 1
 			} else {
@@ -400,7 +432,7 @@ Get keys from cache by pattern
 
   - Result: [ user:123, user:256, user:ABC ]
 */
-func KEYS(c *storage.Cache, args []string) {
+func KEYS(c *storage.Cache, args ...string) {
 	if len(args) == 0 || len(args) == 2 || len(args) > 3 {
 		logger.Error("Invalid syntax")
 		return
@@ -465,16 +497,17 @@ func INFO(c *storage.Cache, k string) {
 		fmt.Println("		key:", k)
 		fmt.Println("		value:", cd.Value)
 		fmt.Println("		requests:", cd.Requests)
-		fmt.Println("		created_at:", cd.TimeStamp)
+		fmt.Println("		type:", cd.Type)
+		fmt.Println("		created_at:", cd.CreatedAt)
 
-		if cd.TTL != nil {
-			ttl := time.Until(*cd.TTL)
+		if cd.ExpiresAt != nil {
+			ttl := time.Until(*cd.ExpiresAt)
 			if ttl < 0 {
 				ttl = 0
 			}
 
 			fmt.Println("		ttl:", int(ttl.Seconds()))
-			fmt.Println("		expires_at:", cd.TTL.Format(time.RFC3339))
+			fmt.Println("		expires_at:", cd.ExpiresAt.Format(time.RFC3339))
 		} else {
 			fmt.Println("		ttl: -1")
 		}

@@ -3,6 +3,7 @@ package commands
 import (
 	"cache/logger"
 	"cache/storage"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -17,6 +18,23 @@ type ZItem struct {
 type ZSet struct {
 	Items map[string]float64
 	Order []ZItem
+}
+
+func parseZSet(s string) (*ZSet, bool) {
+	var z ZSet
+	if err := json.Unmarshal([]byte(s), &z); err != nil {
+		return nil, false
+	}
+	if z.Items == nil {
+		z.Items = make(map[string]float64)
+	}
+
+	return &z, true
+}
+
+func serializeZSet(z ZSet) string {
+	b, _ := json.Marshal(z)
+	return string(b)
 }
 
 func addZOrder(s []ZItem, i ZItem) []ZItem {
@@ -72,16 +90,17 @@ func ZADD(c *storage.Cache, z, v, s string) {
 			}
 
 			c.SetUnsafe(z, &storage.CacheData{
-				Value: ZSet{
+				Value: serializeZSet(ZSet{
 					Items: m,
 					Order: []ZItem{{Member: v, Score: score}},
-				},
+				}),
+				Type:      storage.ZSet,
 				Requests:  1,
-				TimeStamp: time.Now(),
+				CreatedAt: time.Now(),
 			})
 		} else {
 			cd.Requests++
-			if zs, ok := cd.Value.(ZSet); ok {
+			if zs, ok := parseZSet(cd.Value); ok {
 				zs.Items[v] = score
 
 				zs.Order = addZOrder(zs.Order, ZItem{
@@ -89,7 +108,7 @@ func ZADD(c *storage.Cache, z, v, s string) {
 					Score:  score,
 				})
 
-				cd.Value = zs
+				cd.Value = serializeZSet(*zs)
 			} else {
 				logger.Error("%s isn't a zset", z)
 				return
@@ -109,11 +128,11 @@ func ZREM(c *storage.Cache, z, v string) {
 		} else {
 			cd.Requests++
 
-			if m, ok := cd.Value.(ZSet); ok {
+			if m, ok := parseZSet(cd.Value); ok {
 				delete(m.Items, v)
 
 				m.Order = removeZOrder(m.Order, v)
-				cd.Value = m
+				cd.Value = serializeZSet(*m)
 			} else {
 				logger.Error("%s isn't a set", z)
 				return
@@ -128,8 +147,6 @@ func ZREM(c *storage.Cache, z, v string) {
 func ZRANGEBYSCORE(c *storage.Cache, z, s, e string) {
 	var slice []ZItem
 
-	fmt.Println(s, e)
-
 	if (s == "max" && e == "min") || (e == "max" && s == "min") {
 		c.WithLock(func() {
 			cd, exists := c.GetUnsafe(z)
@@ -138,10 +155,9 @@ func ZRANGEBYSCORE(c *storage.Cache, z, s, e string) {
 				return
 			}
 
-			// CHECK
 			cd.Requests++
 
-			m, ok := cd.Value.(ZSet)
+			m, ok := parseZSet(cd.Value)
 			if !ok {
 				logger.Error("%s isn't a zset", z)
 				return
@@ -172,7 +188,7 @@ func SCORE(c *storage.Cache, z, k string) {
 			return
 		} else {
 			cd.Requests++
-			if zs, ok := cd.Value.(ZSet); ok {
+			if zs, ok := parseZSet(cd.Value); ok {
 				if s, ok := zs.Items[k]; ok {
 					fmt.Println(s)
 				} else {
@@ -196,7 +212,7 @@ func LSCORE(c *storage.Cache, z string, ks []string) {
 			return
 		} else {
 			cd.Requests++
-			if zs, ok := cd.Value.(ZSet); ok {
+			if zs, ok := parseZSet(cd.Value); ok {
 				for _, k := range ks {
 					if s, ok := zs.Items[k]; ok {
 						res = append(res, s)

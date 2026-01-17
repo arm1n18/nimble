@@ -3,21 +3,56 @@ package commands
 import (
 	"cache/logger"
 	"cache/storage"
+	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 	"time"
 )
 
-// Set value at index in the array
-func LSET(c *storage.Cache, aN string, s []string) {
+func parseList(s string) ([]string, bool) {
+	var l []string
+	if err := json.Unmarshal([]byte(s), &l); err != nil {
+		return nil, false
+	}
+
+	return l, true
+}
+
+func serializeList(l []string) string {
+	b, _ := json.Marshal(l)
+	return string(b)
+}
+
+// Create empty list
+func ESET(c *storage.Cache, l string) {
+	c.WithLock(func() {
+		if _, exists := c.GetUnsafe(l); exists {
+			logger.Error("%s already exists", l)
+			return
+		}
+
+		slice := make([]string, 0)
+
+		c.SetUnsafe(l, &storage.CacheData{
+			Value:     serializeList(slice),
+			Type:      storage.List,
+			Requests:  1,
+			CreatedAt: time.Now(),
+		})
+
+		logger.Success("OK")
+	})
+}
+
+// Set value at index in the list
+func LSET(c *storage.Cache, l string, s ...string) {
 	if len(s) == 0 || len(s)%2 != 0 {
 		logger.Error("Not enough values")
 		return
 	}
 
 	c.WithLock(func() {
-		cd, exists := c.GetUnsafe(aN)
+		cd, exists := c.GetUnsafe(l)
 
 		var slice []string
 
@@ -25,9 +60,9 @@ func LSET(c *storage.Cache, aN string, s []string) {
 			slice = []string{}
 		} else {
 			var ok bool
-			slice, ok = cd.Value.([]string)
+			slice, ok = parseList(cd.Value)
 			if !ok {
-				logger.Error("%s isn`t array", aN)
+				logger.Error("%s isn`t list", l)
 				return
 			}
 		}
@@ -56,13 +91,14 @@ func LSET(c *storage.Cache, aN string, s []string) {
 		}
 
 		if !exists {
-			c.SetUnsafe(aN, &storage.CacheData{
-				Value:     slice,
+			c.SetUnsafe(l, &storage.CacheData{
+				Value:     serializeList(slice),
+				Type:      storage.List,
 				Requests:  1,
-				TimeStamp: time.Now(),
+				CreatedAt: time.Now(),
 			})
 		} else {
-			cd.Value = slice
+			cd.Value = serializeList(slice)
 			cd.Requests++
 		}
 
@@ -70,25 +106,25 @@ func LSET(c *storage.Cache, aN string, s []string) {
 	})
 }
 
-// Get value at index in the array
-func LGET(c *storage.Cache, aN string, s []string) {
+// Get value at index in the list
+func LGET(c *storage.Cache, l string, s ...string) {
 	if len(s) == 0 {
 		logger.Error("Not enough values")
 		return
 	}
 
 	c.WithLock(func() {
-		cd, exists := c.GetUnsafe(aN)
+		cd, exists := c.GetUnsafe(l)
 
 		var slice []string
 
 		if !exists {
-			logger.Error("Can`t find %v in memory", aN)
+			logger.Error("Can`t find %v in memory", l)
 			return
 		} else {
-			cd, ok := cd.Value.([]string)
+			cd, ok := parseList(cd.Value)
 			if !ok {
-				logger.Error("%s isn`t array", aN)
+				logger.Error("%s isn`t list", l)
 				return
 			}
 
@@ -107,8 +143,8 @@ func LGET(c *storage.Cache, aN string, s []string) {
 	})
 }
 
-// Push to the start of the array
-func SPUSH(c *storage.Cache, aN string, s []string) {
+// Push to the start of the list
+func SPUSH(c *storage.Cache, l string, s ...string) {
 	if len(s) == 0 {
 		logger.Error("Not enough values")
 		return
@@ -119,22 +155,24 @@ func SPUSH(c *storage.Cache, aN string, s []string) {
 	// }
 
 	c.WithLock(func() {
-		cd, exists := c.GetUnsafe(aN)
+		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			c.SetUnsafe(aN, &storage.CacheData{
-				Value:     append([]string{}, s...),
+			c.SetUnsafe(l, &storage.CacheData{
+				Value:     serializeList(append([]string{}, s...)),
+				Type:      storage.List,
 				Requests:  1,
-				TimeStamp: time.Now(),
+				CreatedAt: time.Now(),
 			})
 		} else {
-			slice, ok := cd.Value.([]string)
+			slice, ok := parseList(cd.Value)
 			if !ok {
-				logger.Error("%s isn`t array", aN)
+				logger.Error("%s isn`t list", l)
 				return
 			}
 
-			cd.Value = append(s, slice...)
+			slice = append(s, slice...)
+			cd.Value = serializeList(slice)
 			cd.Requests++
 		}
 
@@ -142,34 +180,32 @@ func SPUSH(c *storage.Cache, aN string, s []string) {
 	})
 }
 
-// Push to the end of the array
-func EPUSH(c *storage.Cache, aN string, s []string) {
+// Push to the end of the list
+func EPUSH(c *storage.Cache, l string, s ...string) {
 	if len(s) == 0 {
 		logger.Error("Not enough values")
 		return
 	}
 
-	// if ok := removeQuotes(&s, 0, 1); !ok {
-	// 	return
-	// }
-
 	c.WithLock(func() {
-		cd, exists := c.GetUnsafe(aN)
+		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			c.SetUnsafe(aN, &storage.CacheData{
-				Value:     append([]string{}, s...),
+			c.SetUnsafe(l, &storage.CacheData{
+				Value:     serializeList(append([]string{}, s...)),
+				Type:      storage.List,
 				Requests:  1,
-				TimeStamp: time.Now(),
+				CreatedAt: time.Now(),
 			})
 		} else {
-			slice, ok := cd.Value.([]string)
+			slice, ok := parseList(cd.Value)
 			if !ok {
-				logger.Error("%s isn`t array", aN)
+				logger.Error("%s isn`t list", l)
 				return
 			}
 
-			cd.Value = append(slice, s...)
+			slice = append(slice, s...)
+			cd.Value = serializeList(slice)
 			cd.Requests++
 		}
 
@@ -177,8 +213,8 @@ func EPUSH(c *storage.Cache, aN string, s []string) {
 	})
 }
 
-// Remove from the start of the array
-func SPOP(c *storage.Cache, aN, s string) {
+// Remove from the start of the list
+func SPOP(c *storage.Cache, l, s string) {
 	q := 1
 
 	if s != "" {
@@ -191,30 +227,25 @@ func SPOP(c *storage.Cache, aN, s string) {
 	}
 
 	c.WithLock(func() {
-		cd, exists := c.GetUnsafe(aN)
+		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			logger.Error("Can`t find %v in memory", aN)
+			logger.Error("Can`t find %v in memory", l)
 			return
 		}
 
-		slice, ok := cd.Value.([]string)
+		slice, ok := parseList(cd.Value)
 		if !ok {
-			logger.Error("%s isn`t array", aN)
+			logger.Error("%s isn`t list", l)
 			return
 		}
 
 		if len(slice) < q {
-			logger.Error("Current q is bigger then len")
 			q = len(slice)
 		}
 
 		slice = slice[q:]
 
-		if len(slice) == 0 {
-			delete(c.GetData(), aN)
-		} else {
-			cd.Value = slice
-		}
+		cd.Value = serializeList(slice)
 
 		cd.Requests++
 
@@ -222,8 +253,8 @@ func SPOP(c *storage.Cache, aN, s string) {
 	})
 }
 
-// Remove from the end of the array
-func EPOP(c *storage.Cache, aN, s string) {
+// Remove from the end of the list
+func EPOP(c *storage.Cache, l, s string) {
 	q := 1
 
 	if s != "" {
@@ -236,30 +267,25 @@ func EPOP(c *storage.Cache, aN, s string) {
 	}
 
 	c.WithLock(func() {
-		cd, exists := c.GetUnsafe(aN)
+		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			logger.Error("Can`t find %v in memory", aN)
+			logger.Error("Can`t find %v in memory", l)
 			return
 		}
 
-		slice, ok := cd.Value.([]string)
+		slice, ok := parseList(cd.Value)
 		if !ok {
-			logger.Error("%s isn`t array", aN)
+			logger.Error("%s isn`t list", l)
 			return
 		}
 
-		if len(slice) < q {
-			logger.Error("Current q is bigger then len")
-			q = len(slice)
-		}
-
-		slice = slice[:q]
-
-		if len(slice) == 0 {
-			delete(c.GetData(), aN)
+		if q >= len(slice) {
+			slice = []string{}
 		} else {
-			cd.Value = slice
+			slice = slice[q:]
 		}
+
+		cd.Value = serializeList(slice)
 
 		cd.Requests++
 
@@ -267,8 +293,8 @@ func EPOP(c *storage.Cache, aN, s string) {
 	})
 }
 
-// Get list of an array in a given range
-func SRANGE(c *storage.Cache, aN string, s []string) {
+// Get list of l list in a given range
+func SRANGE(c *storage.Cache, l string, s []string) {
 	if len(s) != 2 {
 		logger.Error("Not enough values")
 		return
@@ -286,20 +312,19 @@ func SRANGE(c *storage.Cache, aN string, s []string) {
 		return
 	}
 
-	cd, exists := c.GetUnsafe(aN)
+	cd, exists := c.GetUnsafe(l)
 
 	if !exists {
-		logger.Error("Can`t find %v in memory", aN)
+		logger.Error("Can`t find %v in memory", l)
 		return
 	}
 
-	v := reflect.ValueOf(cd.Value)
-
-	if v.Kind() != reflect.Slice {
+	v, ok := parseList(cd.Value)
+	if !ok {
 		logger.Error("Value is not a slice")
 		return
 	}
-	length := v.Len()
+	length := len(v)
 
 	if end == -1 || end > length {
 		end = length
@@ -313,28 +338,32 @@ func SRANGE(c *storage.Cache, aN string, s []string) {
 		logger.Error("Invalid range")
 	}
 
+	list := make([]string, 0, end-start)
+
 	for i := start; i < end; i++ {
-		fmt.Printf("%v) %v\n", i+1, v.Index(i).Interface())
+		// fmt.Printf("%v) %v\n", i+1, v[i])
+		list = append(list, v[i])
 	}
+
+	fmt.Println(list)
 }
 
-// Check if the values exist in the array and return their quantity
-func CONTAINS(c *storage.Cache, aN string, ks []string) {
+// Check if the values exist in the list and return their quantity
+func CONTAINS(c *storage.Cache, l string, ks []string) {
 	var res int
 
 	c.WithRWLock(func() {
-		cd, exists := c.GetUnsafe(aN)
+		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			logger.Error("can`t find %v in memory", aN)
+			logger.Error("can`t find %v in memory", l)
 			return
 		}
 
-		// CHECK
 		cd.Requests++
 
-		s, ok := cd.Value.([]string)
+		s, ok := parseList(cd.Value)
 		if !ok {
-			logger.Error("%s isn`t array", aN)
+			logger.Error("%s isn`t list", l)
 			return
 		}
 
@@ -350,22 +379,21 @@ func CONTAINS(c *storage.Cache, aN string, ks []string) {
 	fmt.Println(res)
 }
 
-// Check if the values exist in the array and return array
-func LCONTAINS(c *storage.Cache, aN string, ks []string) {
+// Check if the values exist in the list and return list
+func LCONTAINS(c *storage.Cache, l string, ks []string) {
 	res := make([]int, len(ks))
 	c.WithRWLock(func() {
-		cd, exists := c.GetUnsafe(aN)
+		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			logger.Error("can`t find %v in memory", aN)
+			logger.Error("can`t find %v in memory", l)
 			return
 		}
 
-		// CHECK
 		cd.Requests++
 
-		s, ok := cd.Value.([]string)
+		s, ok := parseList(cd.Value)
 		if !ok {
-			logger.Error("%s isn`t array", aN)
+			logger.Error("%s isn`t list", l)
 			return
 		}
 
@@ -386,20 +414,20 @@ func LCONTAINS(c *storage.Cache, aN string, ks []string) {
 	fmt.Println(res)
 }
 
-// Return index of target value in array
-func INDEXOF(c *storage.Cache, aN, k string) {
+// Return index of target value in list
+func INDEXOF(c *storage.Cache, l, k string) {
 	c.WithRWLock(func() {
-		cd, exists := c.GetUnsafe(aN)
+		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			logger.Error("can`t find %v in memory", aN)
+			logger.Error("can`t find %v in memory", l)
 			return
 		}
 
 		cd.Requests++
 
-		s, ok := cd.Value.([]string)
+		s, ok := parseList(cd.Value)
 		if !ok {
-			logger.Error("%s isn`t array", aN)
+			logger.Error("%s isn`t list", l)
 			return
 		}
 
@@ -416,18 +444,18 @@ func INDEXOF(c *storage.Cache, aN, k string) {
 	})
 }
 
-// Get length of the array
-func LLEN(c *storage.Cache, aN string) {
+// Get length of the list
+func LLEN(c *storage.Cache, l string) {
 	c.WithRWLock(func() {
-		cd, exists := c.GetUnsafe(aN)
+		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			logger.Error("Can`t find %v in memory", aN)
+			logger.Error("Can`t find %v in memory", l)
 			return
 		} else {
-			cd, ok := cd.Value.([]string)
+			cd, ok := parseList(cd.Value)
 			if !ok {
-				logger.Error("%s isn`t array", aN)
+				logger.Error("%s isn`t list", l)
 				return
 			}
 			fmt.Println(len(cd))
@@ -436,22 +464,22 @@ func LLEN(c *storage.Cache, aN string) {
 	})
 }
 
-// Clear the array
-func LCLEAR(c *storage.Cache, aN string) {
+// Clear the list
+func LCLEAR(c *storage.Cache, l string) {
 	c.WithLock(func() {
-		cd, exists := c.GetUnsafe(aN)
+		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			logger.Error("Can`t find %v in memory", aN)
+			logger.Error("Can`t find %v in memory", l)
 			return
 		} else {
-			_, ok := cd.Value.([]string)
+			_, ok := parseList(cd.Value)
 			if !ok {
-				logger.Error("%s isn`t array", aN)
+				logger.Error("%s isn`t list", l)
 				return
 			}
 
-			cd.Value = []string{}
+			cd.Value = serializeList([]string{})
 			cd.Requests++
 
 			logger.Success("OK")

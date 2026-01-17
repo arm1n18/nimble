@@ -4,7 +4,6 @@ import (
 	"cache/logger"
 	"cache/storage"
 	"fmt"
-	"reflect"
 	"strconv"
 	"unsafe"
 )
@@ -52,32 +51,32 @@ func SIZEOF(c *storage.Cache, ks []string) {
 		}
 
 		for _, k := range ks {
-			cacheData, exists := cd[k]
-			if !exists {
-				logger.Error("Can`t find %v in memory", k)
-				return
-			}
+			// cd, exists := cd[k]
+			// if !exists {
+			// 	logger.Error("Can`t find %v in memory", k)
+			// 	return
+			// }
 
-			switch v := cacheData.Value.(type) {
-			case string:
-				b += uint64(unsafe.Sizeof(v))
-				b += uint64(len(v))
-			case int:
-				b += uint64(unsafe.Sizeof(v))
-			case []string:
-				for _, i := range v {
-					b += uint64(unsafe.Sizeof(i))
-					b += uint64(len(i))
-				}
-			case map[string]string:
-				b += uint64(unsafe.Sizeof(v))
-				for k, v := range v {
-					b += uint64(len(k))
-					b += uint64(unsafe.Sizeof(k))
-					b += uint64(len(v))
-					b += uint64(unsafe.Sizeof(v))
-				}
-			}
+			// switch v := cd.Type {
+			// case string:
+			// 	b += uint64(unsafe.Sizeof(v))
+			// 	b += uint64(len(v))
+			// case int:
+			// 	b += uint64(unsafe.Sizeof(v))
+			// case []string:
+			// 	for _, i := range v {
+			// 		b += uint64(unsafe.Sizeof(i))
+			// 		b += uint64(len(i))
+			// 	}
+			// case map[string]string:
+			// 	b += uint64(unsafe.Sizeof(v))
+			// 	for k, v := range v {
+			// 		b += uint64(len(k))
+			// 		b += uint64(unsafe.Sizeof(k))
+			// 		b += uint64(len(v))
+			// 		b += uint64(unsafe.Sizeof(v))
+			// 	}
+			// }
 
 			fmt.Printf("Size of %s is %v\n", k, b)
 		}
@@ -86,11 +85,11 @@ func SIZEOF(c *storage.Cache, ks []string) {
 
 // Show the type of data stored in the cache
 func TYPE(c *storage.Cache, k string) {
-	cacheData, exists := c.GetSafe(k)
+	cd, exists := c.GetSafe(k)
 	if !exists {
 		logger.Error("Can`t find %v in memory", k)
 		return
 	}
 
-	fmt.Println(reflect.TypeOf(cacheData.Value).Kind())
+	fmt.Println(cd.Type)
 }

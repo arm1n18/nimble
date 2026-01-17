@@ -3,11 +3,29 @@ package commands
 import (
 	"cache/logger"
 	"cache/storage"
+	"encoding/json"
 	"fmt"
 	"time"
 )
 
-func SADD(c *storage.Cache, z string, vs []string) {
+func parseSet(s string) (map[string]struct{}, bool) {
+	var m map[string]struct{}
+	if err := json.Unmarshal([]byte(s), &m); err != nil {
+		return nil, false
+	}
+	if m == nil {
+		m = make(map[string]struct{})
+	}
+
+	return m, true
+}
+
+func serializeSet(s map[string]struct{}) string {
+	b, _ := json.Marshal(s)
+	return string(b)
+}
+
+func SADD(c *storage.Cache, z string, vs ...string) {
 	if len(vs) == 0 {
 		logger.Error("Not enough values")
 		return
@@ -24,29 +42,32 @@ func SADD(c *storage.Cache, z string, vs []string) {
 			}
 
 			c.SetUnsafe(z, &storage.CacheData{
-				Value:     m,
+				Value:     serializeSet(m),
+				Type:      storage.Set,
 				Requests:  1,
-				TimeStamp: time.Now(),
+				CreatedAt: time.Now(),
 			})
+			logger.Success("OK")
 		} else {
 			cd.Requests++
-			if m, ok := cd.Value.(map[string]struct{}); ok {
+			if m, ok := parseSet(cd.Value); ok {
 				for _, v := range vs {
 					if _, ok := m[v]; !ok {
 						m[v] = struct{}{}
 					}
 				}
+
+				cd.Value = serializeSet(m)
+				logger.Success("OK")
 			} else {
 				logger.Error("%s isn't a set", z)
 				return
 			}
 		}
 	})
-
-	logger.Success("OK")
 }
 
-func SREM(c *storage.Cache, z string, vs []string) {
+func SREM(c *storage.Cache, z string, vs ...string) {
 	if len(vs) == 0 {
 		logger.Error("Not enough values")
 		return
@@ -60,21 +81,21 @@ func SREM(c *storage.Cache, z string, vs []string) {
 		} else {
 			cd.Requests++
 
-			if m, ok := cd.Value.(map[string]struct{}); ok {
+			if m, ok := parseSet(cd.Value); ok {
 				for _, v := range vs {
 					delete(m, v)
 				}
+				cd.Value = serializeSet(m)
+				logger.Success("OK")
 			} else {
 				logger.Error("%s isn't a set", z)
 				return
 			}
 		}
 	})
-
-	logger.Success("OK")
 }
 
-func SCONTAINS(c *storage.Cache, z string, vs []string) {
+func SCONTAINS(c *storage.Cache, z string, vs ...string) {
 	var res int
 
 	c.WithRWLock(func() {
@@ -84,38 +105,42 @@ func SCONTAINS(c *storage.Cache, z string, vs []string) {
 			return
 		}
 
-		// CHECK
 		cd.Requests++
 
-		// m, ok := cd.Value.(map[string]struct{})
-		// if !ok {
-		// 	logger.Error("%s isn`t set", m)
-		// 	return
-		// }
-
-		switch m := cd.Value.(type) {
-		case map[string]struct{}:
+		switch cd.Type {
+		case storage.Set:
+			m, ok := parseSet(cd.Value)
+			if !ok {
+				logger.Error("can't parse set: %s", z)
+				return
+			}
 			for _, v := range vs {
 				if _, ok := m[v]; ok {
 					res++
 				}
 			}
-		case ZSet:
+			fmt.Println(res)
+		case storage.ZSet:
+			m, ok := parseZSet(cd.Value)
+			if !ok {
+				logger.Error("can't parse zset: %s", z)
+				return
+			}
 			for _, v := range vs {
 				if _, ok := m.Items[v]; ok {
 					res++
 				}
 			}
+			fmt.Println(res)
 		default:
 			logger.Error("%s isn't a set", z)
 			return
 		}
 	})
 
-	fmt.Println(res)
 }
 
-func LSCONTAINS(c *storage.Cache, z string, vs []string) {
+func LSCONTAINS(c *storage.Cache, z string, vs ...string) {
 	res := make([]int, len(vs))
 
 	c.WithRWLock(func() {
@@ -125,11 +150,15 @@ func LSCONTAINS(c *storage.Cache, z string, vs []string) {
 			return
 		}
 
-		// CHECK
 		cd.Requests++
 
-		switch m := cd.Value.(type) {
-		case map[string]struct{}:
+		switch cd.Type {
+		case storage.Set:
+			m, ok := parseSet(cd.Value)
+			if !ok {
+				logger.Error("can't parse set: %s", z)
+				return
+			}
 			for i, v := range vs {
 				if _, ok := m[v]; ok {
 					res[i] = 1
@@ -137,7 +166,14 @@ func LSCONTAINS(c *storage.Cache, z string, vs []string) {
 					res[i] = 0
 				}
 			}
-		case ZSet:
+
+			fmt.Println(res)
+		case storage.ZSet:
+			m, ok := parseZSet(cd.Value)
+			if !ok {
+				logger.Error("can't parse zset: %s", z)
+				return
+			}
 			for i, v := range vs {
 				if _, ok := m.Items[v]; ok {
 					res[i] = 1
@@ -145,13 +181,13 @@ func LSCONTAINS(c *storage.Cache, z string, vs []string) {
 					res[i] = 0
 				}
 			}
+
+			fmt.Println(res)
 		default:
 			logger.Error("%s isn't a set", z)
 			return
 		}
 	})
-
-	fmt.Println(res)
 }
 
 func SLEN(c *storage.Cache, z string) {
@@ -162,19 +198,22 @@ func SLEN(c *storage.Cache, z string) {
 			return
 		}
 
-		// CHECK
 		cd.Requests++
 
-		// m, ok := cachedData.Value.(map[string]struct{})
-		// if !ok {
-		// 	logger.Error("%s isn't a set", z)
-		// 	return
-		// }
-
-		switch m := cd.Value.(type) {
-		case map[string]struct{}:
+		switch cd.Type {
+		case storage.Set:
+			m, ok := parseSet(cd.Value)
+			if !ok {
+				logger.Error("can't parse set: %s", z)
+				return
+			}
 			fmt.Println(len(m))
-		case ZSet:
+		case storage.ZSet:
+			m, ok := parseZSet(cd.Value)
+			if !ok {
+				logger.Error("can't parse zset: %s", z)
+				return
+			}
 			fmt.Println(len(m.Items))
 		default:
 			logger.Error("%s isn't a set", z)
@@ -193,23 +232,34 @@ func SMEMBERS(c *storage.Cache, z string) {
 			return
 		}
 
-		// CHECK
 		cd.Requests++
 
-		switch m := cd.Value.(type) {
-		case map[string]struct{}:
+		switch cd.Type {
+		case storage.Set:
+			m, ok := parseSet(cd.Value)
+			if !ok {
+				logger.Error("can't parse set: %s", z)
+				return
+			}
 			for k := range m {
 				slice = append(slice, k)
 			}
-		case ZSet:
+
+			fmt.Println(slice)
+		case storage.ZSet:
+			m, ok := parseZSet(cd.Value)
+			if !ok {
+				logger.Error("can't parse zset: %s", z)
+				return
+			}
 			for _, k := range m.Order {
 				slice = append(slice, k.Member)
 			}
+
+			fmt.Println(slice)
 		default:
 			logger.Error("%s isn't a set", z)
 			return
 		}
-
-		fmt.Println(slice)
 	})
 }

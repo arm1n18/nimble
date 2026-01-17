@@ -6,23 +6,36 @@ import (
 	"strconv"
 )
 
+func parseFloat(v any) (float64, bool) {
+	f, err := strconv.ParseFloat(v.(string), 64)
+	if err != nil {
+		return -1, false
+	}
+
+	return f, true
+}
+
+func serializeFloat(v float64) string {
+	return strconv.FormatFloat(v, 'f', -1, 64)
+}
+
 // Increase the number by 1
 func INCR(c *storage.Cache, k string) {
 	c.WithLock(func() {
-		cachedData, exists := c.GetUnsafe(k)
+		cd, exists := c.GetUnsafe(k)
 		if !exists {
 			logger.Error("Can`t find %v in memory", k)
 			return
 		}
 
-		currentValue, ok := cachedData.Value.(float64)
+		cv, ok := parseFloat(cd.Value)
 		if !ok {
 			logger.Error("Mismatch type")
 			return
 		}
 
-		cachedData.Value = float64(currentValue) + 1
-		cachedData.Requests++
+		cd.Value = serializeFloat(cv + 1)
+		cd.Requests++
 
 		logger.Success("OK")
 	})
@@ -31,132 +44,132 @@ func INCR(c *storage.Cache, k string) {
 // Decrease the number by 1
 func DECR(c *storage.Cache, k string) {
 	c.WithLock(func() {
-		cachedData, exists := c.GetUnsafe(k)
+		cd, exists := c.GetUnsafe(k)
 		if !exists {
 			logger.Error("Can`t find %v in memory", k)
 			return
 		}
 
-		currentValue, ok := cachedData.Value.(float64)
+		cv, ok := parseFloat(cd.Value)
 		if !ok {
 			logger.Error("Mismatch type")
 			return
 		}
 
-		cachedData.Value = float64(currentValue) - 1
-		cachedData.Requests++
+		cd.Value = serializeFloat(cv - 1)
+		cd.Requests++
 
 		logger.Success("OK")
 	})
 }
 
 // Increase the number by n
-func INCRBY(c *storage.Cache, k, d string) {
-	digit, err := strconv.ParseFloat(d, 64)
-	if err != nil {
+func INCRBY(c *storage.Cache, k, v string) {
+	f, ok := parseFloat(v)
+	if !ok {
 		logger.Error("Can`t parse number")
 		return
 	}
 
 	c.WithLock(func() {
-		cachedData, exists := c.GetUnsafe(k)
+		cd, exists := c.GetUnsafe(k)
 		if !exists {
 			logger.Error("Can`t find %v in memory", k)
 			return
 		}
 
-		currentValue, ok := cachedData.Value.(float64)
+		cv, ok := parseFloat(cd.Value)
 		if !ok {
 			logger.Error("Mismatch type")
 			return
 		}
 
-		cachedData.Value = float64(currentValue) + digit
-		cachedData.Requests++
+		cd.Value = serializeFloat(cv + f)
+		cd.Requests++
 
 		logger.Success("OK")
 	})
 }
 
 // Decrease the number by n
-func DECRBY(c *storage.Cache, k, d string) {
-	digit, err := strconv.ParseFloat(d, 64)
-	if err != nil {
+func DECRBY(c *storage.Cache, k, v string) {
+	f, ok := parseFloat(v)
+	if !ok {
 		logger.Error("Can`t parse number")
 		return
 	}
 
 	c.WithLock(func() {
-		cachedData, exists := c.GetUnsafe(k)
+		cd, exists := c.GetUnsafe(k)
 		if !exists {
 			logger.Error("Can`t find %v in memory", k)
 			return
 		}
 
-		currentValue, ok := cachedData.Value.(float64)
+		cv, ok := parseFloat(cd.Value)
 		if !ok {
 			logger.Error("Mismatch type")
 			return
 		}
 
-		cachedData.Value = float64(currentValue) - digit
-		cachedData.Requests++
+		cd.Value = serializeFloat(cv - f)
+		cd.Requests++
 
 		logger.Success("OK")
 	})
 }
 
 // Multiply the number by n
-func MULL(c *storage.Cache, k, d string) {
-	digit, err := strconv.ParseFloat(d, 64)
-	if err != nil {
+func MULL(c *storage.Cache, k, v string) {
+	f, ok := parseFloat(v)
+	if !ok {
 		logger.Error("Can`t parse number")
 		return
 	}
 
 	c.WithLock(func() {
-		cachedData, exists := c.GetUnsafe(k)
+		cd, exists := c.GetUnsafe(k)
 		if !exists {
 			logger.Error("Can`t find %v in memory", k)
 			return
 		}
 
-		currentValue, ok := cachedData.Value.(float64)
+		cv, ok := parseFloat(cd.Value)
 		if !ok {
 			logger.Error("Mismatch type")
 			return
 		}
 
-		cachedData.Value = float64(currentValue) * digit
-		cachedData.Requests++
+		cd.Value = serializeFloat(cv * f)
+		cd.Requests++
 
 		logger.Success("OK")
 	})
 }
 
 // Divide the number by n
-func DIV(c *storage.Cache, k, d string) {
-	digit, err := strconv.ParseFloat(d, 64)
-	if err != nil {
+func DIV(c *storage.Cache, k, v string) {
+	f, ok := parseFloat(v)
+	if !ok {
 		logger.Error("Can`t parse number")
 		return
 	}
 
 	c.WithLock(func() {
-		cachedData, exists := c.GetUnsafe(k)
+		cd, exists := c.GetUnsafe(k)
 		if !exists {
 			logger.Error("Can`t find %v in memory", k)
 			return
 		}
 
-		currentValue, ok := cachedData.Value.(float64)
+		cv, ok := parseFloat(cd.Value)
 		if !ok {
 			logger.Error("Mismatch type")
 			return
 		}
 
-		cachedData.Value = float64(currentValue) / digit
-		cachedData.Requests++
+		cd.Value = serializeFloat(cv / f)
+		cd.Requests++
 
 		logger.Success("OK")
 	})

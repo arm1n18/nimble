@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 )
 
 var (
@@ -84,6 +85,7 @@ func main() {
 	go serverStart()
 
 	c := storage.CreateCache()
+	go c.StartBgClenup(5 * time.Second)
 
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -127,6 +129,15 @@ func main() {
 
 		switch strings.ToUpper(cmdName) {
 		case "SET":
+			if len(cmdArgs) != 2 {
+				logger.Error("Invalid syntax")
+				break
+			}
+
+			secure.ReadOnlyMiddleware(c, func() {
+				cmd.SET(c, cmdArgs[0], cmdArgs[1])
+			})
+		case "MSET":
 			if len(cmdArgs) < 2 || len(cmdArgs)%2 != 0 {
 				logger.Error("Invalid syntax")
 				break
@@ -134,28 +145,26 @@ func main() {
 
 			res := regexp.MustCompile(`"[^"]*"|\S+`)
 			secure.ReadOnlyMiddleware(c, func() {
-				cmd.SET(c, res.FindAllString(strings.Join(cmdArgs, " "), -1))
+				cmd.MSET(c, res.FindAllString(strings.Join(cmdArgs, " "), -1)...)
 			})
-		case "NUMSET":
-			if len(cmdArgs) == 0 || len(cmdArgs[1:]) == 0 {
+		case "GET":
+			if len(cmdArgs) != 1 {
 				logger.Error("Invalid syntax")
 				break
 			}
-			secure.ReadOnlyMiddleware(c, func() {
-				cmd.NUMSET(c, cmdArgs)
-			})
-		case "GET":
+			cmd.GET(c, cmdArgs[0])
+		case "MGET":
 			if len(cmdArgs) == 0 {
 				logger.Error("Invalid syntax")
 				break
 			}
-			cmd.GET(c, cmdArgs)
+			cmd.MGET(c, cmdArgs...)
 		case "KEYS":
 			if len(cmdArgs) == 0 {
 				logger.Error("Invalid syntax")
 				break
 			}
-			cmd.KEYS(c, cmdArgs)
+			cmd.KEYS(c, cmdArgs...)
 		case "HSET":
 			if len(cmdArgs[1:]) == 0 {
 				logger.Error("Invalid syntax")
@@ -164,7 +173,7 @@ func main() {
 			res := regexp.MustCompile(`"[^"]*"|\S+`)
 			matches := res.FindAllString(strings.Join(cmdArgs, " "), -1)
 			secure.ReadOnlyMiddleware(c, func() {
-				cmd.HSET(c, cmdArgs[0], matches[1:])
+				cmd.HSET(c, cmdArgs[0], matches[1:]...)
 			})
 		case "SADD":
 			if len(cmdArgs[1:]) == 0 {
@@ -174,7 +183,7 @@ func main() {
 			res := regexp.MustCompile(`"[^"]*"|\S+`)
 			matches := res.FindAllString(strings.Join(cmdArgs, " "), -1)
 			secure.ReadOnlyMiddleware(c, func() {
-				cmd.SADD(c, cmdArgs[0], matches[1:])
+				cmd.SADD(c, cmdArgs[0], matches[1:]...)
 			})
 		case "SREM":
 			if len(cmdArgs[1:]) == 0 {
@@ -184,7 +193,7 @@ func main() {
 			res := regexp.MustCompile(`"[^"]*"|\S+`)
 			matches := res.FindAllString(strings.Join(cmdArgs, " "), -1)
 			secure.ReadOnlyMiddleware(c, func() {
-				cmd.SREM(c, cmdArgs[0], matches[1:])
+				cmd.SREM(c, cmdArgs[0], matches[1:]...)
 			})
 		case "SLEN":
 			if len(cmdArgs) > 1 {
@@ -233,13 +242,13 @@ func main() {
 				logger.Error("Invalid syntax")
 				break
 			}
-			cmd.HGET(c, cmdArgs[0], cmdArgs[1:])
+			cmd.HGET(c, cmdArgs[0], cmdArgs[1:]...)
 		case "HDEL":
 			if len(cmdArgs[1:]) == 0 {
 				logger.Error("Invalid syntax")
 				break
 			}
-			cmd.HDEL(c, cmdArgs[0], cmdArgs[1:])
+			cmd.HDEL(c, cmdArgs[0], cmdArgs[1:]...)
 		case "HLEN":
 			if len(cmdArgs) > 1 {
 				logger.Error("Invalid syntax")
@@ -282,6 +291,15 @@ func main() {
 			secure.ReadOnlyMiddleware(c, func() {
 				cmd.RENAME(c, cmdArgs[0], cmdArgs[1])
 			})
+		case "ESET":
+			if len(cmdArgs) != 1 {
+				logger.Error("Invalid syntax")
+				break
+			}
+
+			secure.ReadOnlyMiddleware(c, func() {
+				cmd.ESET(c, cmdArgs[0])
+			})
 		case "LSET":
 			if len(cmdArgs) < 2 {
 				logger.Error("Invalid syntax")
@@ -290,7 +308,7 @@ func main() {
 			res := regexp.MustCompile(`"[^"]*"|\S+`)
 			matches := res.FindAllString(strings.Join(cmdArgs, " "), -1)
 			secure.ReadOnlyMiddleware(c, func() {
-				cmd.LSET(c, cmdArgs[0], matches[1:])
+				cmd.LSET(c, cmdArgs[0], matches[1:]...)
 			})
 		case "LGET":
 			if len(cmdArgs) < 1 {
@@ -299,7 +317,7 @@ func main() {
 			}
 			res := regexp.MustCompile(`"[^"]*"|\S+`)
 			matches := res.FindAllString(strings.Join(cmdArgs, " "), -1)
-			cmd.LGET(c, cmdArgs[0], matches[1:])
+			cmd.LGET(c, cmdArgs[0], matches[1:]...)
 		case "LCLEAR":
 			if len(cmdArgs) > 1 {
 				logger.Error("Invalid syntax")
@@ -320,7 +338,7 @@ func main() {
 			res := regexp.MustCompile(`"[^"]*"|\S+`)
 			matches := res.FindAllString(strings.Join(cmdArgs, " "), -1)
 			secure.ReadOnlyMiddleware(c, func() {
-				cmd.SPUSH(c, cmdArgs[0], matches[1:])
+				cmd.SPUSH(c, cmdArgs[0], matches[1:]...)
 			})
 		case "EPUSH":
 			if len(cmdArgs) < 2 {
@@ -330,13 +348,17 @@ func main() {
 			res := regexp.MustCompile(`"[^"]*"|\S+`)
 			matches := res.FindAllString(strings.Join(cmdArgs, " "), -1)
 			secure.ReadOnlyMiddleware(c, func() {
-				cmd.SPUSH(c, cmdArgs[0], matches[1:])
+				cmd.SPUSH(c, cmdArgs[0], matches[1:]...)
 			})
 		case "SPOP":
 			if len(cmdArgs) > 2 {
 				logger.Error("Invalid syntax")
 				break
 			}
+			if len(cmdArgs) == 1 {
+				cmdArgs = append(cmdArgs, "")
+			}
+
 			secure.ReadOnlyMiddleware(c, func() {
 				cmd.SPOP(c, cmdArgs[0], cmdArgs[1])
 			})
@@ -345,6 +367,10 @@ func main() {
 				logger.Error("Invalid syntax")
 				break
 			}
+			if len(cmdArgs) == 1 {
+				cmdArgs = append(cmdArgs, "")
+			}
+
 			secure.ReadOnlyMiddleware(c, func() {
 				cmd.EPOP(c, cmdArgs[0], cmdArgs[1])
 			})
@@ -437,25 +463,25 @@ func main() {
 				logger.Error("Invalid syntax")
 				break
 			}
-			cmd.EXISTS(c, cmdArgs)
+			cmd.EXISTS(c, cmdArgs...)
 		case "LEXISTS":
 			if len(cmdArgs[1:]) == 0 {
 				logger.Error("Invalid syntax")
 				break
 			}
-			cmd.LEXISTS(c, cmdArgs)
+			cmd.LEXISTS(c, cmdArgs...)
 		case "HCONTAINS":
 			if len(cmdArgs[1:]) == 0 {
 				logger.Error("Invalid syntax")
 				break
 			}
-			cmd.HCONTAINS(c, cmdArgs[0], cmdArgs[1:])
+			cmd.HCONTAINS(c, cmdArgs[0], cmdArgs[1:]...)
 		case "LHCONTAINS":
 			if len(cmdArgs[1:]) == 0 {
 				logger.Error("Invalid syntax")
 				break
 			}
-			cmd.LHCONTAINS(c, cmdArgs[0], cmdArgs[1:])
+			cmd.LHCONTAINS(c, cmdArgs[0], cmdArgs[1:]...)
 		case "CONTAINS":
 			if len(cmdArgs[1:]) == 0 {
 				logger.Error("Invalid syntax")
@@ -473,13 +499,13 @@ func main() {
 				logger.Error("Invalid syntax")
 				break
 			}
-			cmd.SCONTAINS(c, cmdArgs[0], cmdArgs[1:])
+			cmd.SCONTAINS(c, cmdArgs[0], cmdArgs[1:]...)
 		case "LSCONTAINS":
 			if len(cmdArgs[1:]) == 0 {
 				logger.Error("Invalid syntax")
 				break
 			}
-			cmd.LSCONTAINS(c, cmdArgs[0], cmdArgs[1:])
+			cmd.LSCONTAINS(c, cmdArgs[0], cmdArgs[1:]...)
 		case "INDEXOF":
 			if len(cmdArgs[1:]) == 0 {
 				logger.Error("Invalid syntax")

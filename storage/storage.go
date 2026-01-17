@@ -16,20 +16,32 @@ const (
 	ReadWrite Mode = "read-write"
 )
 
+type CacheDataType string
+
+const (
+	String CacheDataType = "string"
+	List   CacheDataType = "list"
+	Hash   CacheDataType = "hash"
+	Set    CacheDataType = "set"
+	ZSet   CacheDataType = "zset"
+)
+
 type CacheDataUpdate struct {
-	Value     interface{}
+	Value     *string
 	Requests  *int
-	TimeStamp *time.Time
-	TTK       *time.Timer
-	TTL       *time.Time
+	Type      *CacheDataType
+	CreatedAt *time.Time
+	ExpiresAt *time.Time
+	// TTL       *time.Time
 }
 
 type CacheData struct {
-	Value     interface{}
+	Value     string
 	Requests  int
-	TimeStamp time.Time
-	TTK       *time.Timer
-	TTL       *time.Time
+	Type      CacheDataType
+	CreatedAt time.Time
+	ExpiresAt *time.Time
+	// TTL       *time.Time
 }
 
 type Cache struct {
@@ -66,8 +78,14 @@ func (c *Cache) WithRWLock(fn func()) {
 }
 
 func (c *Cache) GetUnsafe(k string) (*CacheData, bool) {
-	cacheData, exists := c.data[k]
-	return cacheData, exists
+	cd, exists := c.data[k]
+
+	if exists && cd.ExpiresAt != nil && cd.ExpiresAt.Before(time.Now()) {
+		delete(c.data, k)
+		return nil, false
+	}
+
+	return cd, exists
 }
 
 func (c *Cache) GetSafe(k string) (*CacheData, bool) {
@@ -101,22 +119,41 @@ func (c *Cache) SetPartialUnsafe(k string, nD CacheDataUpdate) {
 	}
 
 	if nD.Value != nil {
-		cd.Value = nD.Value
+		cd.Value = *nD.Value
 	}
 	if nD.Requests != nil {
 		cd.Requests = *nD.Requests
 	}
-	if nD.TimeStamp != nil {
-		cd.TimeStamp = *nD.TimeStamp
+	if nD.CreatedAt != nil {
+		cd.CreatedAt = *nD.CreatedAt
 	}
-	if nD.TTK != nil {
-		cd.TTK = nD.TTK
-	}
-	if nD.TTL != nil {
-		cd.TTL = nD.TTL
+
+	cd.ExpiresAt = nD.ExpiresAt
+
+	if nD.Type != nil {
+		cd.Type = *nD.Type
 	}
 }
 
 func (c *Cache) SetMode(m Mode) {
 	c.mode = m
+}
+
+func (c *Cache) StartBgClenup(interval time.Duration) {
+	func() {
+		t := time.NewTicker(interval)
+		defer t.Stop()
+
+		for range t.C {
+			now := time.Now()
+
+			c.WithLock(func() {
+				for k, v := range c.data {
+					if v.ExpiresAt != nil && now.After(*v.ExpiresAt) {
+						delete(c.data, k)
+					}
+				}
+			})
+		}
+	}()
 }
