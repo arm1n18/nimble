@@ -1,10 +1,9 @@
 package commands
 
 import (
-	"cache/logger"
-	"cache/storage"
 	"encoding/json"
-	"fmt"
+	"nimble/formatter"
+	"nimble/storage"
 	"time"
 )
 
@@ -26,8 +25,8 @@ func serializeHash(m map[string]string) string {
 }
 
 // Store hashset in the cache
-func HSET(c *storage.Cache, h string, kv ...string) {
-	hash := make(map[string]string)
+func HSET(c *storage.Cache, h string, kv ...string) string {
+	var result string
 
 	if len(kv)%2 == 0 && len(kv) != 0 {
 
@@ -36,6 +35,8 @@ func HSET(c *storage.Cache, h string, kv ...string) {
 		// }
 
 		c.WithLock(func() {
+			hash := make(map[string]string)
+
 			if cd, exists := c.GetUnsafe(h); exists {
 				cd.Requests++
 
@@ -50,7 +51,7 @@ func HSET(c *storage.Cache, h string, kv ...string) {
 						Requests: cd.Requests + 1,
 					})
 
-					logger.Success("OK")
+					result = formatter.Ok()
 					return
 				}
 			}
@@ -66,57 +67,26 @@ func HSET(c *storage.Cache, h string, kv ...string) {
 				CreatedAt: time.Now(),
 			})
 
-			logger.Success("OK")
+			result = formatter.Ok()
 		})
 	} else {
-		logger.Error("Not enough values")
-		return
+		return formatter.ErrNotEnoughValues.Error()
 	}
+
+	return result
 }
 
 // Get hashset data from the cache by key
-func HGET(c *storage.Cache, h string, ks ...string) {
-	res := make([]string, len(ks))
+func HGET(c *storage.Cache, h string, ks ...string) string {
+	var result string
 
-	cd, exists := c.GetSafe(h)
-	if !exists {
-		if len(ks) == 1 {
-			fmt.Println(nil)
-		} else {
-			res = append(res, "nil")
-		}
-		return
-	}
-
-	cd.Requests++
-
-	m, ok := parseHash(cd.Value)
-	if !ok {
-		logger.Error("%s isn't a hash", h)
-		for i := range res {
-			res[i] = "nil"
-		}
-
-		fmt.Println(res)
-	}
-
-	for i, k := range ks {
-		if v, exists := m[k]; exists {
-			res[i] = v
-		} else {
-			res[i] = "nil"
-		}
-	}
-
-	fmt.Println(res)
-}
-
-// Get hashset data keys
-func HKEYS(c *storage.Cache, h string) {
 	c.WithLock(func() {
+		arr := make([]string, len(ks))
+
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			logger.Error("can`t find %v in memory", h)
+			// todocmd
+			result = formatter.Nil()
 			return
 		}
 
@@ -124,7 +94,42 @@ func HKEYS(c *storage.Cache, h string) {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			logger.Error("%s isn't a hash", h)
+			// result = formatter.ErrorMessage("%s isn't a hash", h)
+			result = formatter.ErrMismatchType.Error()
+			return
+		}
+
+		for i, k := range ks {
+			if v, exists := m[k]; exists {
+				arr[i] = v
+			} else {
+				arr[i] = formatter.Nil()
+			}
+		}
+
+		result = formatter.Array(serializeList(arr))
+	})
+
+	return result
+}
+
+// Get hashset data keys
+func HKEYS(c *storage.Cache, h string) string {
+	var result string
+
+	c.WithLock(func() {
+		cd, exists := c.GetUnsafe(h)
+		if !exists {
+			result = formatter.Nil()
+			return
+		}
+
+		cd.Requests++
+
+		m, ok := parseHash(cd.Value)
+		if !ok {
+			// result = formatter.ErrorMessage("%s isn't a hash", h)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 
@@ -133,16 +138,21 @@ func HKEYS(c *storage.Cache, h string) {
 			s = append(s, k)
 		}
 
-		fmt.Println(s)
+		result = formatter.Array(serializeList(s))
 	})
+
+	return result
 }
 
 // Get hashset data values
-func HVALUES(c *storage.Cache, h string) {
+func HVALUES(c *storage.Cache, h string) string {
+	var result string
+
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			logger.Error("can`t find %v in memory", h)
+			// result = formatter.ErrorMessage("can`t find %v in memory", h)
+			result = formatter.Nil()
 			return
 		}
 
@@ -150,7 +160,8 @@ func HVALUES(c *storage.Cache, h string) {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			logger.Error("%s isn't a hash", h)
+			// result = formatter.ErrorMessage("%s isn't a hash", h)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 
@@ -159,21 +170,27 @@ func HVALUES(c *storage.Cache, h string) {
 			s = append(s, v)
 		}
 
-		fmt.Println(s)
+		result = formatter.Array(serializeList(s))
 	})
+
+	return result
 }
 
 // Get hashset data from the cache by key
-func HDEL(c *storage.Cache, h string, kv ...string) {
+func HDEL(c *storage.Cache, h string, kv ...string) string {
+	var result string
+
 	if len(kv) == 0 {
-		logger.Error("Not enough values")
-		return
+		return formatter.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
+		var q int
+
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			logger.Error("can`t find %v in memory", h)
+			// result = formatter.ErrorMessage("can`t find %v in memory", h)
+			result = formatter.Nil()
 			return
 		}
 
@@ -181,16 +198,15 @@ func HDEL(c *storage.Cache, h string, kv ...string) {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			logger.Error("%s isn't a hash", h)
+			// result = formatter.ErrorMessage("%s isn't a hash", h)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 
 		for _, k := range kv {
 			if _, exists := m[k]; exists {
 				delete(m, k)
-			} else {
-				logger.Error("key %s doesn`t exist in hash %s", k, h)
-				return
+				q++
 			}
 		}
 
@@ -199,72 +215,23 @@ func HDEL(c *storage.Cache, h string, kv ...string) {
 			Requests: cd.Requests + 1,
 		})
 
-		logger.Success("OK")
+		result = formatter.Number(q)
 	})
+
+	return result
 }
 
 // Check if the keys exist in the hashset and return their quantity
-func HCONTAINS(c *storage.Cache, h string, kv ...string) {
-	var res int
+func HCONTAINS(c *storage.Cache, h string, kv ...string) string {
+	var result string
 
-	cd, exists := c.GetSafe(h)
-	if !exists {
-		logger.Error("can`t find %v in memory", h)
-		return
-	}
-
-	cd.Requests++
-
-	m, ok := parseHash(cd.Value)
-	if !ok {
-		logger.Error("%s isn't a hash", h)
-		fmt.Println(0)
-	}
-
-	for _, k := range kv {
-		if _, exists := m[k]; exists {
-			res++
-		}
-	}
-
-	fmt.Println(res)
-}
-
-// Check if the keys exist in the hashset and return array
-func LHCONTAINS(c *storage.Cache, h string, kv ...string) {
-	res := make([]int, len(kv))
-
-	cd, exists := c.GetSafe(h)
-	if !exists {
-		logger.Error("can`t find %v in memory", h)
-		return
-	}
-
-	cd.Requests++
-
-	m, ok := parseHash(cd.Value)
-	if !ok {
-		logger.Error("%s isn't a hash", h)
-		fmt.Println(0)
-	}
-
-	for i, k := range kv {
-		if _, exists := m[k]; exists {
-			res[i] = 1
-		} else {
-			res[i] = 0
-		}
-	}
-
-	fmt.Println(res)
-}
-
-// Get hashset length
-func HLEN(c *storage.Cache, h string) {
 	c.WithRWLock(func() {
+		var q int
+
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			logger.Error("can`t find %v in memory", h)
+			result = formatter.ErrorMessage("can`t find %v in memory", h)
+			result = formatter.Nil()
 			return
 		}
 
@@ -272,10 +239,81 @@ func HLEN(c *storage.Cache, h string) {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			logger.Error("%s isn't a hash", h)
+			// result = formatter.ErrorMessage("%s isn't a hash", h)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 
-		fmt.Println(len(m))
+		for _, k := range kv {
+			if _, exists := m[k]; exists {
+				q++
+			}
+		}
+
+		result = formatter.Number(q)
 	})
+
+	return result
+}
+
+// Check if the keys exist in the hashset and return array
+func LHCONTAINS(c *storage.Cache, h string, kv ...string) string {
+	var result string
+
+	c.WithRWLock(func() {
+		arr := make([]string, len(kv))
+
+		cd, exists := c.GetUnsafe(h)
+		if !exists {
+			result = formatter.Nil()
+			return
+		}
+
+		cd.Requests++
+
+		m, ok := parseHash(cd.Value)
+		if !ok {
+			// result = formatter.ErrorMessage("%s isn't a hash", h)
+			result = formatter.ErrMismatchType.Error()
+			return
+		}
+
+		for i, k := range kv {
+			if _, exists := m[k]; exists {
+				arr[i] = "1"
+			} else {
+				arr[i] = "0"
+			}
+		}
+
+		result = formatter.Array(serializeList(arr))
+	})
+
+	return result
+}
+
+// Get hashset length
+func HLEN(c *storage.Cache, h string) string {
+	var result string
+
+	c.WithRWLock(func() {
+		cd, exists := c.GetUnsafe(h)
+		if !exists {
+			result = formatter.Nil()
+			return
+		}
+
+		cd.Requests++
+
+		m, ok := parseHash(cd.Value)
+		if !ok {
+			// result = formatter.ErrorMessage("%s isn't a hash", h)
+			result = formatter.ErrMismatchType.Error()
+			return
+		}
+
+		result = formatter.Number(len(m))
+	})
+
+	return result
 }

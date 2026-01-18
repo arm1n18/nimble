@@ -1,10 +1,9 @@
 package commands
 
 import (
-	"cache/logger"
-	"cache/storage"
 	"encoding/json"
-	"fmt"
+	"nimble/formatter"
+	"nimble/storage"
 	"strconv"
 	"time"
 )
@@ -24,45 +23,46 @@ func serializeList(l []string) string {
 }
 
 // Create empty list
-func ESET(c *storage.Cache, l string) {
-	c.WithLock(func() {
-		if _, exists := c.GetUnsafe(l); exists {
-			logger.Error("%s already exists", l)
-			return
-		}
+func ESET(c *storage.Cache, l string) string {
+	var result string
 
-		slice := make([]string, 0)
+	c.WithLock(func() {
+		arr := make([]string, 0)
 
 		c.SetUnsafe(l, &storage.CacheData{
-			Value:     serializeList(slice),
+			Value:     serializeList(arr),
 			Type:      storage.List,
 			Requests:  1,
 			CreatedAt: time.Now(),
 		})
 
-		logger.Success("OK")
+		result = formatter.Success()
 	})
+
+	return result
 }
 
 // Set value at index in the list
-func LSET(c *storage.Cache, l string, s ...string) {
+func LSET(c *storage.Cache, l string, s ...string) string {
+	var result string
+
 	if len(s) == 0 || len(s)%2 != 0 {
-		logger.Error("Not enough values")
-		return
+		return formatter.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
 
-		var slice []string
+		var arr []string
+		var q int
 
 		if !exists {
-			slice = []string{}
+			arr = []string{}
 		} else {
 			var ok bool
-			slice, ok = parseList(cd.Value)
+			arr, ok = parseList(cd.Value)
 			if !ok {
-				logger.Error("%s isn`t list", l)
+				result = formatter.ErrorMessage("%s isn`t list", l)
 				return
 			}
 		}
@@ -70,84 +70,97 @@ func LSET(c *storage.Cache, l string, s ...string) {
 		for i := 0; i < len(s); i += 2 {
 			index, err := strconv.Atoi(s[i])
 			if err != nil {
-				logger.Error("Index must be a number: %s", s[i])
-				return
+				// result = formatter.ErrorMessage("Index must be a number: %s", s[i])
+				// result = formatter.ErrNotANumber.Error()
+				continue
 			}
-
-			v := s[i+1]
 
 			if index < 0 {
-				logger.Error("Index out of range: %v", index)
-				return
+				// result = formatter.ErrorMessage("Index out of range: %v", index)
+				result = formatter.ErrInvalidRange.Error()
+				continue
 			}
 
-			if index >= len(slice) {
+			if index >= len(arr) {
 				nS := make([]string, index+1)
-				copy(nS, slice)
-				slice = nS
+				copy(nS, arr)
+				arr = nS
 			}
 
-			slice[index] = v
+			arr[index] = s[i+1]
+			q++
 		}
 
 		if !exists {
 			c.SetUnsafe(l, &storage.CacheData{
-				Value:     serializeList(slice),
+				Value:     serializeList(arr),
 				Type:      storage.List,
 				Requests:  1,
 				CreatedAt: time.Now(),
 			})
 		} else {
-			cd.Value = serializeList(slice)
+			cd.Value = serializeList(arr)
 			cd.Requests++
 		}
 
-		logger.Success("OK")
+		result = formatter.Number(q)
 	})
+
+	return result
 }
 
 // Get value at index in the list
-func LGET(c *storage.Cache, l string, s ...string) {
+func LGET(c *storage.Cache, l string, s ...string) string {
+	var result string
+
 	if len(s) == 0 {
-		logger.Error("Not enough values")
-		return
+		return formatter.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
-
-		var slice []string
-
 		if !exists {
-			logger.Error("Can`t find %v in memory", l)
+			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
+			result = formatter.Nil()
 			return
 		} else {
-			cd, ok := parseList(cd.Value)
+			list, ok := parseList(cd.Value)
 			if !ok {
-				logger.Error("%s isn`t list", l)
+				// result = formatter.ErrorMessage("%s isn`t list", l)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 
-			for i := 0; i < len(s); i++ {
-				index, err := strconv.Atoi(s[i])
+			res := make([]string, 0, len(s))
+			for _, v := range s {
+				index, err := strconv.Atoi(v)
 				if err != nil {
-					logger.Error("Index must be a number: %s", s[i])
+					// result = formatter.ErrorMessage("Index must be a number: %s", s[i])
+					// result = formatter.ErrNotANumber.Error()
 					return
 				}
 
-				slice = append(slice, cd[index])
-			}
-		}
+				if index < 0 || index >= len(list) {
+					res = append(res, formatter.Nil())
+					continue
+				}
 
-		fmt.Println(slice)
+				res = append(res, list[index])
+			}
+
+			result = formatter.Array(serializeList(res))
+		}
 	})
+
+	return result
 }
 
 // Push to the start of the list
-func SPUSH(c *storage.Cache, l string, s ...string) {
+func SPUSH(c *storage.Cache, l string, s ...string) string {
+	var result string
+
 	if len(s) == 0 {
-		logger.Error("Not enough values")
-		return
+		return formatter.ErrNotEnoughValues.Error()
 	}
 
 	// if ok := removeQuotes(&s, 0, 1); !ok {
@@ -158,204 +171,232 @@ func SPUSH(c *storage.Cache, l string, s ...string) {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
+			value := append([]string{}, s...)
+
 			c.SetUnsafe(l, &storage.CacheData{
-				Value:     serializeList(append([]string{}, s...)),
+				Value:     serializeList(value),
 				Type:      storage.List,
 				Requests:  1,
 				CreatedAt: time.Now(),
 			})
 		} else {
-			slice, ok := parseList(cd.Value)
+			arr, ok := parseList(cd.Value)
 			if !ok {
-				logger.Error("%s isn`t list", l)
+				// result = formatter.ErrorMessage("%s isn`t list", l)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 
-			slice = append(s, slice...)
-			cd.Value = serializeList(slice)
+			arr = append(s, arr...)
+			cd.Value = serializeList(arr)
 			cd.Requests++
 		}
 
-		logger.Success("OK")
+		result = formatter.Number(len(s))
 	})
+
+	return result
 }
 
 // Push to the end of the list
-func EPUSH(c *storage.Cache, l string, s ...string) {
+func EPUSH(c *storage.Cache, l string, s ...string) string {
+	var result string
+
 	if len(s) == 0 {
-		logger.Error("Not enough values")
-		return
+		return formatter.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
+			value := append([]string{}, s...)
+
 			c.SetUnsafe(l, &storage.CacheData{
-				Value:     serializeList(append([]string{}, s...)),
+				Value:     serializeList(value),
 				Type:      storage.List,
 				Requests:  1,
 				CreatedAt: time.Now(),
 			})
 		} else {
-			slice, ok := parseList(cd.Value)
+			arr, ok := parseList(cd.Value)
 			if !ok {
-				logger.Error("%s isn`t list", l)
+				// result = formatter.ErrorMessage("%s isn`t list", l)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 
-			slice = append(slice, s...)
-			cd.Value = serializeList(slice)
+			arr = append(arr, s...)
+			cd.Value = serializeList(arr)
 			cd.Requests++
 		}
 
-		logger.Success("OK")
+		result = formatter.Number(len(s))
 	})
+
+	return result
 }
 
 // Remove from the start of the list
-func SPOP(c *storage.Cache, l, s string) {
+func SPOP(c *storage.Cache, l, s string) string {
+	var result string
+
 	q := 1
 
 	if s != "" {
 		var err error
 		q, err = strconv.Atoi(s)
 		if err != nil {
-			logger.Error("Can`t parse number")
-			return
+			return formatter.ErrNotANumber.Error()
 		}
 	}
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			logger.Error("Can`t find %v in memory", l)
+			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
+			result = formatter.Failure()
 			return
 		}
 
-		slice, ok := parseList(cd.Value)
+		list, ok := parseList(cd.Value)
 		if !ok {
-			logger.Error("%s isn`t list", l)
+			// formatter.ErrorMessage("%s isn`t list", l)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 
-		if len(slice) < q {
-			q = len(slice)
+		if len(list) < q {
+			q = len(list)
 		}
 
-		slice = slice[q:]
-
-		cd.Value = serializeList(slice)
-
+		rm := append([]string{}, list[:q]...)
+		cd.Value = serializeList(list[q:])
 		cd.Requests++
 
-		logger.Success("OK")
+		result = formatter.Array(serializeList(rm))
 	})
+
+	return result
 }
 
 // Remove from the end of the list
-func EPOP(c *storage.Cache, l, s string) {
+func EPOP(c *storage.Cache, l, s string) string {
+	var result string
+
 	q := 1
 
 	if s != "" {
 		var err error
 		q, err = strconv.Atoi(s)
 		if err != nil {
-			logger.Error("Can`t parse number")
-			return
+			return formatter.ErrNotANumber.Error()
 		}
 	}
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			logger.Error("Can`t find %v in memory", l)
+			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
+			result = formatter.Failure()
 			return
 		}
 
-		slice, ok := parseList(cd.Value)
+		list, ok := parseList(cd.Value)
 		if !ok {
-			logger.Error("%s isn`t list", l)
+			// result = formatter.ErrorMessage("%s isn`t list", l)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 
-		if q >= len(slice) {
-			slice = []string{}
-		} else {
-			slice = slice[q:]
+		if q > len(list) {
+			q = len(list)
 		}
 
-		cd.Value = serializeList(slice)
+		start := len(list) - q
+		rm := append([]string{}, list[start:]...)
 
+		cd.Value = serializeList(list[:start])
 		cd.Requests++
 
-		logger.Success("OK")
+		result = formatter.Array(serializeList(rm))
 	})
+
+	return result
 }
 
 // Get list of l list in a given range
-func SRANGE(c *storage.Cache, l string, s []string) {
+func SRANGE(c *storage.Cache, l string, s []string) string {
+	var result string
+
 	if len(s) != 2 {
-		logger.Error("Not enough values")
-		return
+		return formatter.ErrNotEnoughValues.Error()
 	}
 
 	start, err := strconv.Atoi(s[0])
 	if err != nil {
-		logger.Error("Can`t parse number")
-		return
+		return formatter.ErrNotANumber.Error()
 	}
 
 	end, err := strconv.Atoi(s[1])
 	if err != nil {
-		logger.Error("Can`t parse number")
-		return
+		return formatter.ErrNotANumber.Error()
 	}
 
-	cd, exists := c.GetUnsafe(l)
+	c.WithRWLock(func() {
+		cd, exists := c.GetUnsafe(l)
 
-	if !exists {
-		logger.Error("Can`t find %v in memory", l)
-		return
-	}
+		if !exists {
+			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
+			result = formatter.Nil()
+			return
+		}
 
-	v, ok := parseList(cd.Value)
-	if !ok {
-		logger.Error("Value is not a slice")
-		return
-	}
-	length := len(v)
+		v, ok := parseList(cd.Value)
+		if !ok {
+			// result = formatter.ErrorMessage("%s isn`t list", l)
+			result = formatter.ErrMismatchType.Error()
+			return
+		}
 
-	if end == -1 || end > length {
-		end = length
-	}
+		length := len(v)
 
-	if start < 0 {
-		start = 0
-	}
+		if end == -1 || end > length {
+			end = length
+		}
 
-	if start > end {
-		logger.Error("Invalid range")
-	}
+		if start < 0 {
+			start = 0
+		}
 
-	list := make([]string, 0, end-start)
+		if start > end {
+			result = formatter.ErrInvalidRange.Error()
+			return
+		}
 
-	for i := start; i < end; i++ {
-		// fmt.Printf("%v) %v\n", i+1, v[i])
-		list = append(list, v[i])
-	}
+		arr := make([]string, 0, end-start)
 
-	fmt.Println(list)
+		for i := start; i < end; i++ {
+			arr = append(arr, v[i])
+		}
+
+		result = formatter.Array(serializeList(arr))
+	})
+
+	return result
 }
 
 // Check if the values exist in the list and return their quantity
-func CONTAINS(c *storage.Cache, l string, ks []string) {
-	var res int
+func CONTAINS(c *storage.Cache, l string, ks []string) string {
+	var result string
 
 	c.WithRWLock(func() {
+		var q int
+
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			logger.Error("can`t find %v in memory", l)
+			// result = formatter.ErrorMessage("can`t find %v in memory", l)
+			result = formatter.Number(-1)
 			return
 		}
 
@@ -363,29 +404,37 @@ func CONTAINS(c *storage.Cache, l string, ks []string) {
 
 		s, ok := parseList(cd.Value)
 		if !ok {
-			logger.Error("%s isn`t list", l)
+			// result = formatter.ErrorMessage("%s isn`t list", l)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 
+		m := make(map[string]int)
 		for _, v := range s {
-			for _, k := range ks {
-				if k == v {
-					res++
-				}
-			}
+			m[v]++
 		}
+
+		for _, k := range ks {
+			q += m[k]
+		}
+
+		result = formatter.Number(q)
 	})
 
-	fmt.Println(res)
+	return result
 }
 
 // Check if the values exist in the list and return list
-func LCONTAINS(c *storage.Cache, l string, ks []string) {
-	res := make([]int, len(ks))
+func LCONTAINS(c *storage.Cache, l string, ks []string) string {
+	var result string
+
 	c.WithRWLock(func() {
+		arr := make([]string, len(ks))
+
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			logger.Error("can`t find %v in memory", l)
+			// result = formatter.ErrorMessage("can`t find %v in memory", l)
+			result = formatter.Nil()
 			return
 		}
 
@@ -393,7 +442,8 @@ func LCONTAINS(c *storage.Cache, l string, ks []string) {
 
 		s, ok := parseList(cd.Value)
 		if !ok {
-			logger.Error("%s isn`t list", l)
+			// result = formatter.ErrorMessage("%s isn`t list", l)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 
@@ -404,22 +454,27 @@ func LCONTAINS(c *storage.Cache, l string, ks []string) {
 
 		for i, k := range ks {
 			if _, exists := tM[k]; exists {
-				res[i] = 1
+				arr[i] = "1"
 			} else {
-				res[i] = 0
+				arr[i] = "0"
 			}
 		}
+
+		result = formatter.Array(serializeList(arr))
 	})
 
-	fmt.Println(res)
+	return result
 }
 
 // Return index of target value in list
-func INDEXOF(c *storage.Cache, l, k string) {
+func INDEXOF(c *storage.Cache, l, k string) string {
+	var result string
+
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			logger.Error("can`t find %v in memory", l)
+			// result = formatter.ErrorMessage("can`t find %v in memory", l)
+			result = formatter.Number(-1)
 			return
 		}
 
@@ -427,63 +482,76 @@ func INDEXOF(c *storage.Cache, l, k string) {
 
 		s, ok := parseList(cd.Value)
 		if !ok {
-			logger.Error("%s isn`t list", l)
+			// result = formatter.ErrorMessage("%s isn`t list", l)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 
-		tI := -1
+		i := -1
 
-		for i, v := range s {
+		for j, v := range s {
 			if v == k {
-				tI = i
+				i = j
 				break
 			}
 		}
 
-		fmt.Println(tI)
+		result = formatter.Number(i)
 	})
+
+	return result
 }
 
 // Get length of the list
-func LLEN(c *storage.Cache, l string) {
+func LLEN(c *storage.Cache, l string) string {
+	var result string
+
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			logger.Error("Can`t find %v in memory", l)
+			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
+			result = formatter.Number(-1)
 			return
 		} else {
-			cd, ok := parseList(cd.Value)
+			list, ok := parseList(cd.Value)
 			if !ok {
-				logger.Error("%s isn`t list", l)
+				// result = formatter.ErrorMessage("%s isn`t list", l)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
-			fmt.Println(len(cd))
+			result = formatter.Number(len(list))
 		}
-
 	})
+
+	return result
 }
 
 // Clear the list
-func LCLEAR(c *storage.Cache, l string) {
+func LCLEAR(c *storage.Cache, l string) string {
+	var result string
+
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			logger.Error("Can`t find %v in memory", l)
+			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
+			result = formatter.Failure()
 			return
 		} else {
 			_, ok := parseList(cd.Value)
 			if !ok {
-				logger.Error("%s isn`t list", l)
+				// result = formatter.ErrorMessage("%s isn`t list", l)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 
 			cd.Value = serializeList([]string{})
 			cd.Requests++
 
-			logger.Success("OK")
+			result = formatter.Success()
 		}
-
 	})
+
+	return result
 }

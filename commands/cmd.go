@@ -1,10 +1,10 @@
 package commands
 
 import (
-	"cache/logger"
-	"cache/storage"
-	"cache/utils"
 	"fmt"
+	"nimble/formatter"
+	"nimble/storage"
+	"nimble/utils"
 	"path"
 	"strconv"
 	"strings"
@@ -58,15 +58,12 @@ func getKeysByPattern(m map[string]*storage.CacheData, pattern string, lim int) 
 }
 
 // Store data of string type in the cache
-func SET(c *storage.Cache, k, v string) {
-	c.WithLock(func() {
-		if k == "" {
-			logger.Error("Key cannot be empty")
-			return
-		}
+func SET(c *storage.Cache, k, v string) string {
+	var result string
 
-		if k == "*" {
-			logger.Error("Can`t use * as key")
+	c.WithLock(func() {
+		if k == "" || k == "*" {
+			result = formatter.ErrWrongKey.Error()
 			return
 		}
 
@@ -76,31 +73,33 @@ func SET(c *storage.Cache, k, v string) {
 			Requests:  1,
 			CreatedAt: time.Now(),
 		})
+
+		result = formatter.Ok()
 	})
 
-	logger.Success("OK")
+	return result
 }
 
 // Store data of string type in the cache
-func MSET(c *storage.Cache, kvs ...string) {
+func MSET(c *storage.Cache, kvs ...string) string {
+	var result string
+
 	if len(kvs)%2 == 0 && len(kvs) != 0 {
 		// if ok := removeQuotes(&s, 1, 1); !ok {
 		// 	return
 		// }
 
+		for i := 0; i < len(kvs); i += 2 {
+			k, _ := kvs[i], kvs[i+1]
+
+			if k == "" || k == "*" {
+				return formatter.ErrWrongKey.Error()
+			}
+		}
+
 		c.WithLock(func() {
 			for i := 0; i < len(kvs); i += 2 {
 				k, v := kvs[i], kvs[i+1]
-
-				if k == "" {
-					logger.Error("Key cannot be empty")
-					return
-				}
-
-				if k == "*" {
-					logger.Error("Can`t use * as key")
-					return
-				}
 
 				c.SetUnsafe(k, &storage.CacheData{
 					Value:     v,
@@ -109,22 +108,24 @@ func MSET(c *storage.Cache, kvs ...string) {
 					CreatedAt: time.Now(),
 				})
 			}
+
+			result = formatter.Ok()
 		})
 	} else {
-		logger.Error("Not enough values")
-		return
+		result = formatter.ErrNotEnoughValues.Error()
+		return result
 	}
 
-	logger.Success("OK")
+	return result
 }
 
 // Get string type of data from the cache
-func GET(c *storage.Cache, k string) {
+func GET(c *storage.Cache, k string) string {
+	var result string
+
 	c.WithLock(func() {
 		if cd, exists := c.GetUnsafe(k); exists {
 			cd.Requests++
-
-			var cV interface{}
 
 			// m, ok := cd.Value.(map[string]struct{})
 			// if ok {
@@ -139,31 +140,31 @@ func GET(c *storage.Cache, k string) {
 			// 	cV = cd.Value
 			// }
 
-			cV = cd.Value
-
-			fmt.Println(cV)
+			result = formatter.String(cd.Value)
 			return
 		} else {
-			fmt.Println(nil)
+			result = formatter.Nil()
 			return
 		}
 	})
+
+	return result
 }
 
 // Get string type of data from the cache
-func MGET(c *storage.Cache, kvs ...string) {
-	var res []interface{}
-
-	if len(kvs) != 1 {
-		res = make([]interface{}, 0, len(kvs))
-	}
+func MGET(c *storage.Cache, kvs ...string) string {
+	var result string
 
 	c.WithLock(func() {
+		var arr []string
+
+		if len(kvs) != 1 {
+			arr = make([]string, 0, len(kvs))
+		}
+
 		for _, k := range kvs {
 			if cd, exists := c.GetUnsafe(k); exists {
 				cd.Requests++
-
-				var cV interface{}
 
 				// m, ok := cd.Value.(map[string]string{})
 				// if ok {
@@ -178,81 +179,102 @@ func MGET(c *storage.Cache, kvs ...string) {
 				// 	cV = cd.Value
 				// }
 
-				cV = cd.Value
-
-				if len(kvs) == 1 {
-					fmt.Println(cV)
-					return
-				} else {
-					res = append(res, cV)
-				}
+				arr = append(arr, cd.Value)
 			} else {
-				if len(k) == 1 {
-					fmt.Println(nil)
-					return
-				} else {
-					res = append(res, nil)
-				}
+				arr = append(arr, formatter.Nil())
 			}
 		}
-		fmt.Println(res)
+
+		result = serializeList(arr)
 	})
+
+	return result
 }
 
 // Remove any type of data from the cache
-func DEL(c *storage.Cache, k string) {
-	if k == "*" {
+func DEL(c *storage.Cache, ks ...string) string {
+	var result string
+	var q int
+
+	if len(ks) == 0 {
+		return formatter.ErrNotEnoughValues.Error()
+	}
+
+	if len(ks) == 1 && ks[0] == "*" {
+		c.WithRWLock(func() {
+			cd := c.GetData()
+			q = len(cd)
+		})
+
 		c.ResetCache()
-		logger.Success("OK")
-		return
+		return formatter.Number(q)
 	}
 
 	c.WithLock(func() {
-		if _, exists := c.GetUnsafe(k); exists {
-			delete(c.GetData(), k)
-		} else {
-			logger.Error("Can`t find %v in memory", k)
-			return
+		for _, k := range ks {
+			if _, exists := c.GetUnsafe(k); exists {
+				delete(c.GetData(), k)
+				q++
+			}
 		}
 
-		logger.Success("OK")
+		result = formatter.Number(q)
 	})
+
+	return result
 }
 
 // Copy data from one structure to another
-func COPY(c *storage.Cache, k1, k2 string) {
+func COPY(c *storage.Cache, k1, k2 string) string {
+	var result string
+
+	if len(k1) == 0 || len(k2) == 0 || k1 == "*" || k2 == "*" {
+		return formatter.ErrWrongKey.Error()
+	}
+
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(k1)
 		if !exists {
-			logger.Error("Can`t find %v in memory", k1)
+			// result = formatter.ErrorMessage("Can`t find %v in memory", k1)
+			result = formatter.Failure()
 			return
 		}
 
 		c.SetPartialUnsafe(k2, storage.CacheDataUpdate{Value: &cd.Value, Type: &cd.Type})
 
-		logger.Success("OK")
+		result = formatter.Success()
 	})
+
+	return result
 }
 
 // Show all the keys
-func LIST(c *storage.Cache) {
-	i := 1
+func LIST(c *storage.Cache) string {
+	var result string
 
 	c.WithRWLock(func() {
 		cd := c.GetData()
+		arr := make([]string, 0, len(cd))
 
-		for v, k := range cd {
-			fmt.Printf("%v) [ %s ] = %v\n", i, v, k.Value)
-			i++
+		for k := range cd {
+			arr = append(arr, k)
 		}
+
+		result = formatter.Array(serializeList(arr))
 	})
+
+	return result
 }
 
 // Show the number of keys
-func LISTLEN(c *storage.Cache) {
+func LISTLEN(c *storage.Cache) string {
+	var result string
+
 	c.WithRWLock(func() {
-		fmt.Println(len(c.GetData()))
+		result = formatter.Number(len(c.GetData()))
 	})
+
+	return result
 }
 
 /*
@@ -268,16 +290,16 @@ Example:
 
   - Explanation: Sets the key "session:123" to expire in 360 seconds (6 minutes)
 */
-func TTK(c *storage.Cache, k, v string) {
+func TTK(c *storage.Cache, k, v string) string {
+	var result string
+
 	t, err := strconv.Atoi(v)
 	if err != nil {
-		logger.Error("Can`t parse number")
-		return
+		return formatter.ErrInvalidTTL.Error()
 	}
 
 	if t < -1 {
-		logger.Error("TTL must be >= -1")
-		return
+		return formatter.ErrInvalidTTL.Error()
 	}
 
 	var expiresAt *time.Time
@@ -294,13 +316,13 @@ func TTK(c *storage.Cache, k, v string) {
 					ExpiresAt: expiresAt,
 				})
 			}
-			logger.Success("OK")
+			result = formatter.Success()
 			return
 		}
 
 		_, exists := c.GetUnsafe(k)
 		if !exists {
-			logger.Error("Can`t find %v in memory", k)
+			result = formatter.Failure()
 			return
 		}
 
@@ -308,8 +330,10 @@ func TTK(c *storage.Cache, k, v string) {
 			ExpiresAt: expiresAt,
 		})
 
-		logger.Success("OK")
+		result = formatter.Success()
 	})
+
+	return result
 }
 
 /*
@@ -328,22 +352,27 @@ Example:
 
 Notes:
   - If the key exists but has no expiration, returns -1
+  - If the key doesn`t exist, returns -2
 */
-func TTL(c *storage.Cache, k string) {
+func TTL(c *storage.Cache, k string) string {
+	var result string
+
 	c.WithRWLock(func() {
 
 		if dataCache, exists := c.GetSafe(k); exists {
 			if dataCache.ExpiresAt == nil {
-				fmt.Println(-1) // -1 means that data has no TTK
+				result = "-1"
 				return
 			}
 			// fmt.Println(int(time.Since(dataCache.TTL).Seconds()) * -1)
-			fmt.Println(int(time.Until(*dataCache.ExpiresAt).Seconds()))
+			result = formatter.Number(int(time.Until(*dataCache.ExpiresAt).Seconds()))
 		} else {
-			logger.Error("Can`t find %v in memory", k)
+			result = "-2"
 			return
 		}
 	})
+
+	return result
 }
 
 /*
@@ -360,20 +389,23 @@ Example:
 
   - Explanation: (KEY_1 exists, KEY_2 exists, KEY_0 does not exist)
 */
-func EXISTS(c *storage.Cache, kvs ...string) {
-	var res int
+func EXISTS(c *storage.Cache, kvs ...string) string {
+	var result string
 
 	c.WithRWLock(func() {
+		var q int
 		cd := c.GetData()
 
 		for _, k := range kvs {
 			if _, exists := cd[k]; exists {
-				res++
+				q++
 			}
 		}
 
-		fmt.Println(res)
+		result = formatter.Number(q)
 	})
+
+	return result
 }
 
 /*
@@ -395,22 +427,25 @@ Example:
 
   - Explanation: (KEY_1 exists, KEY_2 exists, KEY_0 does not exist)
 */
-func LEXISTS(c *storage.Cache, kvs ...string) {
-	res := make([]int, len(kvs))
+func LEXISTS(c *storage.Cache, kvs ...string) string {
+	var result string
 
 	c.WithRWLock(func() {
+		arr := make([]string, len(kvs))
 		cd := c.GetData()
 
 		for i, k := range kvs {
 			if _, exists := cd[k]; exists {
-				res[i] = 1
+				arr[i] = "1"
 			} else {
-				res[i] = 0
+				arr[i] = "0"
 			}
 		}
 
-		fmt.Println(res)
+		result = formatter.Array(serializeList(arr))
 	})
+
+	return result
 }
 
 /*
@@ -432,10 +467,11 @@ Get keys from cache by pattern
 
   - Result: [ user:123, user:256, user:ABC ]
 */
-func KEYS(c *storage.Cache, args ...string) {
+func KEYS(c *storage.Cache, args ...string) string {
+	var result string
+
 	if len(args) == 0 || len(args) == 2 || len(args) > 3 {
-		logger.Error("Invalid syntax")
-		return
+		return formatter.ErrInvalidSyntax.Error()
 	}
 
 	d := -1
@@ -445,33 +481,37 @@ func KEYS(c *storage.Cache, args ...string) {
 			var err error
 			d, err = strconv.Atoi(args[2])
 			if err != nil {
-				logger.Error("Can`t parse number")
-				return
+				return formatter.ErrNotANumber.Error()
 			}
 		} else {
-			logger.Error("Invalid syntax")
-			return
+			return formatter.ErrInvalidSyntax.Error()
 		}
 	}
 
 	if utils.IsPatternCmd(args[0]) {
 		c.WithLock(func() {
-			fmt.Println(getKeysByPattern(c.GetData(), args[0], d))
+			result = formatter.Array(serializeList(getKeysByPattern(c.GetData(), args[0], d)))
 		})
 	}
+
+	return result
 }
 
-func RENAME(c *storage.Cache, sK, tK string) {
+func RENAME(c *storage.Cache, sK, tK string) string {
+	var result string
+
 	c.WithLock(func() {
 		sCd, exists := c.GetUnsafe(sK)
 		if !exists {
-			logger.Error("can`t find %v in memory", sK)
+			// result = formatter.ErrorMessage("can`t find %v in memory", sK)
+			result = formatter.Failure()
 			return
 		}
 
 		_, exists = c.GetUnsafe(tK)
 		if exists {
-			logger.Error("%v already exists", tK)
+			// result = formatter.ErrorMessage("%v already exists", tK)
+			result = formatter.Failure()
 			return
 		}
 
@@ -480,15 +520,17 @@ func RENAME(c *storage.Cache, sK, tK string) {
 		delete(d, sK)
 		c.SetUnsafe(tK, sCd)
 
-		logger.Success("OK")
+		result = formatter.Success()
 	})
+
+	return result
 }
 
 func INFO(c *storage.Cache, k string) {
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(k)
 		if !exists {
-			logger.Error("Can`t find %v in memory", k)
+			// formatter.ErrorMessage("Can`t find %v in memory", k)
 			return
 		}
 

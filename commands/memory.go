@@ -1,9 +1,9 @@
 package commands
 
 import (
-	"cache/logger"
-	"cache/storage"
 	"fmt"
+	"nimble/formatter"
+	"nimble/storage"
 	"strconv"
 	"unsafe"
 )
@@ -12,27 +12,31 @@ import (
 func MAXMEM(c *storage.Cache, n string) {
 	N_INT, err := strconv.Atoi(n)
 	if err != nil {
-		logger.Error("Can`t parse number")
+		// formatter.ErrNotANumber.Error()
 		return
 	}
 	storage.MAX_MEMO = N_INT
 }
 
 // Check if the memory sizes of the data are equal
-func COMPARE(c *storage.Cache, ks []string) {
+func COMPARE(c *storage.Cache, ks []string) string {
+	var result string
+
 	c.WithRWLock(func() {
 		cd := c.GetData()
 
 		for _, k := range ks {
 			_, exists := cd[k]
 			if !exists {
-				logger.Error("Can`t find %v in memory", k)
+				result = formatter.ErrorMessage("Can`t find %v in memory", k)
 				return
 			}
 		}
 
-		fmt.Println(unsafe.Sizeof(*cd[ks[0]]) == unsafe.Sizeof(*cd[ks[1]]))
+		result = fmt.Sprint(unsafe.Sizeof(*cd[ks[0]]) == unsafe.Sizeof(*cd[ks[1]]))
 	})
+
+	return result
 }
 
 // Check the memory size of the data
@@ -53,7 +57,7 @@ func SIZEOF(c *storage.Cache, ks []string) {
 		for _, k := range ks {
 			// cd, exists := cd[k]
 			// if !exists {
-			// 	logger.Error("Can`t find %v in memory", k)
+			// 	formatter.ErrorMessage("Can`t find %v in memory", k)
 			// 	return
 			// }
 
@@ -84,12 +88,18 @@ func SIZEOF(c *storage.Cache, ks []string) {
 }
 
 // Show the type of data stored in the cache
-func TYPE(c *storage.Cache, k string) {
-	cd, exists := c.GetSafe(k)
-	if !exists {
-		logger.Error("Can`t find %v in memory", k)
-		return
-	}
+func TYPE(c *storage.Cache, k string) string {
+	var result string
 
-	fmt.Println(cd.Type)
+	c.WithRWLock(func() {
+		cd, exists := c.GetUnsafe(k)
+		if !exists {
+			result = formatter.ErrorMessage("Can`t find %v in memory", k)
+			return
+		}
+
+		result = string(cd.Type)
+	})
+
+	return result
 }

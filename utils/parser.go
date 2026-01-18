@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"cache/logger"
+	"nimble/formatter"
 	"strings"
 )
 
@@ -10,7 +10,7 @@ func ParseCommand(input string) (string, []string) {
 	if len(parts) == 0 {
 		return "", []string{}
 	}
-	cmdName := parts[0]
+	cmdName := strings.ToUpper(parts[0])
 	cmdArgs := parts[1:]
 
 	return cmdName, cmdArgs
@@ -24,7 +24,7 @@ func IsPatternCmd(cmd string) bool {
 	case strings.HasSuffix(cmd, "*"):
 		i := strings.Index(cmd, "*")
 		if len(cmd[i:]) > 1 {
-			logger.Error("Invalid pattern command")
+			formatter.ErrorMessage("Invalid pattern command")
 			return false
 		}
 		ok = true
@@ -32,14 +32,14 @@ func IsPatternCmd(cmd string) bool {
 		i := strings.Index(cmd, "?")
 		for _, l := range cmd[i:] {
 			if l != '?' {
-				logger.Error("Invalid pattern command")
+				formatter.ErrorMessage("Invalid pattern command")
 				return false
 			}
 		}
 
 		return true
 	default:
-		logger.Error("Invalid pattern command")
+		formatter.ErrorMessage("Invalid pattern command")
 		ok = false
 	}
 
@@ -55,4 +55,28 @@ func GetPatternSymbol(pattern string) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+func removeQuotes(s *[]string, st, n int) bool {
+	for i := st; i < len(*s); i += n {
+		if len((*s)[i]) >= 2 {
+
+			if (*s)[i][0] == '\'' || (*s)[i][len((*s)[i])-1] == '\'' {
+				formatter.ErrInvalidSyntax.Error()
+				return false
+			}
+
+			if (*s)[i][0] != '"' && (*s)[i][len((*s)[i])-1] != '"' {
+				// (*s)[i] = (*s)[i][1 : len((*s)[i])-1]
+				continue
+			} else if (*s)[i][0] != '"' || (*s)[i][len((*s)[i])-1] != '"' {
+				formatter.ErrInvalidSyntax.Error()
+				return false
+			} else {
+				(*s)[i] = (*s)[i][1 : len((*s)[i])-1]
+			}
+		}
+	}
+
+	return true
 }

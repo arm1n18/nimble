@@ -1,10 +1,9 @@
 package commands
 
 import (
-	"cache/logger"
-	"cache/storage"
 	"encoding/json"
-	"fmt"
+	"nimble/formatter"
+	"nimble/storage"
 	"time"
 )
 
@@ -25,10 +24,11 @@ func serializeSet(s map[string]struct{}) string {
 	return string(b)
 }
 
-func SADD(c *storage.Cache, z string, vs ...string) {
+func SADD(c *storage.Cache, z string, vs ...string) string {
+	var result string
+
 	if len(vs) == 0 {
-		logger.Error("Not enough values")
-		return
+		return formatter.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
@@ -47,7 +47,7 @@ func SADD(c *storage.Cache, z string, vs ...string) {
 				Requests:  1,
 				CreatedAt: time.Now(),
 			})
-			logger.Success("OK")
+			result = formatter.Success()
 		} else {
 			cd.Requests++
 			if m, ok := parseSet(cd.Value); ok {
@@ -58,25 +58,30 @@ func SADD(c *storage.Cache, z string, vs ...string) {
 				}
 
 				cd.Value = serializeSet(m)
-				logger.Success("OK")
+				result = formatter.Success()
 			} else {
-				logger.Error("%s isn't a set", z)
+				// result = formatter.ErrorMessage("%s isn't a set", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 		}
 	})
+
+	return result
 }
 
-func SREM(c *storage.Cache, z string, vs ...string) {
+func SREM(c *storage.Cache, z string, vs ...string) string {
+	var result string
+
 	if len(vs) == 0 {
-		logger.Error("Not enough values")
-		return
+		return formatter.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			logger.Error("Can`t find %v in memory", z)
+			// result = formatter.ErrorMessage("Can`t find %v in memory", z)
+			result = formatter.Failure()
 			return
 		} else {
 			cd.Requests++
@@ -86,22 +91,27 @@ func SREM(c *storage.Cache, z string, vs ...string) {
 					delete(m, v)
 				}
 				cd.Value = serializeSet(m)
-				logger.Success("OK")
+				result = formatter.Success()
 			} else {
-				logger.Error("%s isn't a set", z)
+				// result = formatter.ErrorMessage("%s isn't a set", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 		}
 	})
+
+	return result
 }
 
-func SCONTAINS(c *storage.Cache, z string, vs ...string) {
-	var res int
+func SCONTAINS(c *storage.Cache, z string, vs ...string) string {
+	var result string
 
 	c.WithRWLock(func() {
+		var q int
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			logger.Error("can`t find %v in memory", z)
+			// result = formatter.ErrorMessage("can`t find %v in memory", z)
+			result = formatter.Nil()
 			return
 		}
 
@@ -111,42 +121,51 @@ func SCONTAINS(c *storage.Cache, z string, vs ...string) {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				logger.Error("can't parse set: %s", z)
+				// result = formatter.ErrorMessage("can't parse set: %s", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 			for _, v := range vs {
 				if _, ok := m[v]; ok {
-					res++
+					q++
 				}
 			}
-			fmt.Println(res)
+
+			result = formatter.Number(q)
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				logger.Error("can't parse zset: %s", z)
+				// result = formatter.ErrorMessage("can't parse zset: %s", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 			for _, v := range vs {
 				if _, ok := m.Items[v]; ok {
-					res++
+					q++
 				}
 			}
-			fmt.Println(res)
+
+			result = formatter.Number(q)
 		default:
-			logger.Error("%s isn't a set", z)
+			// result = formatter.ErrorMessage("%s isn't a set", z)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 	})
 
+	return result
 }
 
-func LSCONTAINS(c *storage.Cache, z string, vs ...string) {
-	res := make([]int, len(vs))
+func LSCONTAINS(c *storage.Cache, z string, vs ...string) string {
+	var result string
 
 	c.WithRWLock(func() {
+		arr := make([]string, len(vs))
+
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			logger.Error("can`t find %v in memory", z)
+			// result = formatter.ErrorMessage("can`t find %v in memory", z)
+			result = formatter.Nil()
 			return
 		}
 
@@ -156,45 +175,53 @@ func LSCONTAINS(c *storage.Cache, z string, vs ...string) {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				logger.Error("can't parse set: %s", z)
+				// result = formatter.ErrorMessage("can't parse set: %s", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 			for i, v := range vs {
 				if _, ok := m[v]; ok {
-					res[i] = 1
+					arr[i] = "1"
 				} else {
-					res[i] = 0
+					arr[i] = "0"
 				}
 			}
 
-			fmt.Println(res)
+			result = formatter.Array(serializeList(arr))
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				logger.Error("can't parse zset: %s", z)
+				// result = formatter.ErrorMessage("can't parse zset: %s", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 			for i, v := range vs {
 				if _, ok := m.Items[v]; ok {
-					res[i] = 1
+					arr[i] = "1"
 				} else {
-					res[i] = 0
+					arr[i] = "0"
 				}
 			}
 
-			fmt.Println(res)
+			result = formatter.Array(serializeList(arr))
 		default:
-			logger.Error("%s isn't a set", z)
+			// result = formatter.ErrorMessage("%s isn't a set", z)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 	})
+
+	return result
 }
 
-func SLEN(c *storage.Cache, z string) {
+func SLEN(c *storage.Cache, z string) string {
+	var result string
+
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			logger.Error("can`t find %v in memory", z)
+			// result = formatter.ErrorMessage("can`t find %v in memory", z)
+			result = formatter.Number(-1)
 			return
 		}
 
@@ -204,31 +231,39 @@ func SLEN(c *storage.Cache, z string) {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				logger.Error("can't parse set: %s", z)
+				// result = formatter.ErrorMessage("can't parse set: %s", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
-			fmt.Println(len(m))
+			result = formatter.Number(len(m))
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				logger.Error("can't parse zset: %s", z)
+				// result = formatter.ErrorMessage("can't parse zset: %s", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
-			fmt.Println(len(m.Items))
+			result = formatter.Number(len(m.Items))
 		default:
-			logger.Error("%s isn't a set", z)
+			// result = formatter.ErrorMessage("%s isn't a set", z)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 	})
+
+	return result
 }
 
-func SMEMBERS(c *storage.Cache, z string) {
-	var slice []string
+func SMEMBERS(c *storage.Cache, z string) string {
+	var result string
 
 	c.WithRWLock(func() {
+		var arr []string
+
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			logger.Error("can`t find %v in memory", z)
+			// result = formatter.ErrorMessage("can`t find %v in memory", z)
+			// result = formatter.Nil()
 			return
 		}
 
@@ -238,28 +273,34 @@ func SMEMBERS(c *storage.Cache, z string) {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				logger.Error("can't parse set: %s", z)
+				// result = formatter.ErrorMessage("can't parse set: %s", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 			for k := range m {
-				slice = append(slice, k)
+				arr = append(arr, k)
 			}
 
-			fmt.Println(slice)
+			result = formatter.Array(serializeList(arr))
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				logger.Error("can't parse zset: %s", z)
+				// result = formatter.ErrorMessage("can't parse zset: %s", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
+
 			for _, k := range m.Order {
-				slice = append(slice, k.Member)
+				arr = append(arr, k.Member)
 			}
 
-			fmt.Println(slice)
+			result = formatter.Array(serializeList(arr))
 		default:
-			logger.Error("%s isn't a set", z)
+			// result = formatter.ErrorMessage("%s isn't a set", z)
+			result = formatter.ErrMismatchType.Error()
 			return
 		}
 	})
+
+	return result
 }

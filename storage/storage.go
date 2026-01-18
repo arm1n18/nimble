@@ -139,7 +139,7 @@ func (c *Cache) SetMode(m Mode) {
 	c.mode = m
 }
 
-func (c *Cache) StartBgClenup(interval time.Duration) {
+func (c *Cache) StartBgCleanup(interval time.Duration) {
 	func() {
 		t := time.NewTicker(interval)
 		defer t.Stop()

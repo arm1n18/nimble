@@ -1,10 +1,9 @@
 package commands
 
 import (
-	"cache/logger"
-	"cache/storage"
 	"encoding/json"
-	"fmt"
+	"nimble/formatter"
+	"nimble/storage"
 	"sort"
 	"strconv"
 	"time"
@@ -33,6 +32,11 @@ func parseZSet(s string) (*ZSet, bool) {
 }
 
 func serializeZSet(z ZSet) string {
+	b, _ := json.Marshal(z)
+	return string(b)
+}
+
+func serializeZItems(z ...ZItem) string {
 	b, _ := json.Marshal(z)
 	return string(b)
 }
@@ -75,11 +79,17 @@ func removeZOrder(o []ZItem, t string) []ZItem {
 	return o
 }
 
-func ZADD(c *storage.Cache, z, v, s string) {
+func ZADD(c *storage.Cache, z, v, s string) string {
+	var result string
+
 	score, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		logger.Error("Index must be a number: %s", s)
-		return
+		// return formatter.ErrorMessage("Index must be a number: %s", s)
+		return formatter.ErrNotANumber.Error()
+	}
+
+	if score < 0 {
+		return formatter.ErrInvalidScore.Error()
 	}
 
 	c.WithLock(func() {
@@ -98,60 +108,81 @@ func ZADD(c *storage.Cache, z, v, s string) {
 				Requests:  1,
 				CreatedAt: time.Now(),
 			})
-		} else {
-			cd.Requests++
-			if zs, ok := parseZSet(cd.Value); ok {
-				zs.Items[v] = score
-
-				zs.Order = addZOrder(zs.Order, ZItem{
-					Member: v,
-					Score:  score,
-				})
-
-				cd.Value = serializeZSet(*zs)
-			} else {
-				logger.Error("%s isn't a zset", z)
-				return
-			}
+			result = formatter.Success()
+			return
 		}
 
-		logger.Success("OK")
+		cd.Requests++
+		zs, ok := parseZSet(cd.Value)
+		if !ok {
+			// result = formatter.ErrorMessage("%s isn't a zset", z)
+			result = formatter.ErrMismatchType.Error()
+			return
+		}
+
+		if _, existsInSet := zs.Items[v]; existsInSet {
+			result = formatter.Failure()
+		} else {
+			zs.Items[v] = score
+			zs.Order = addZOrder(zs.Order, ZItem{
+				Member: v,
+				Score:  score,
+			})
+			cd.Value = serializeZSet(*zs)
+
+			result = formatter.Success()
+		}
 	})
+
+	return result
 }
 
-func ZREM(c *storage.Cache, z, v string) {
+func ZREM(c *storage.Cache, z, v string) string {
+	var result string
+
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			logger.Error("Can`t find %v in memory", z)
+			// result = formatter.ErrorMessage("Can`t find %v in memory", z)
+			result = formatter.Failure()
 			return
 		} else {
 			cd.Requests++
 
-			if m, ok := parseZSet(cd.Value); ok {
-				delete(m.Items, v)
-
-				m.Order = removeZOrder(m.Order, v)
-				cd.Value = serializeZSet(*m)
-			} else {
-				logger.Error("%s isn't a set", z)
+			zs, ok := parseZSet(cd.Value)
+			if !ok {
+				// result = formatter.ErrorMessage("%s isn't a set", z)
+				result = formatter.ErrMismatchType.Error()
 				return
+			}
+
+			if _, existsInSet := zs.Items[v]; existsInSet {
+				delete(zs.Items, v)
+
+				zs.Order = removeZOrder(zs.Order, v)
+				cd.Value = serializeZSet(*zs)
+				result = formatter.Success()
+			} else {
+				result = formatter.Failure()
 			}
 
 		}
 	})
 
-	logger.Success("OK")
+	return result
 }
 
-func ZRANGEBYSCORE(c *storage.Cache, z, s, e string) {
-	var slice []ZItem
+func ZRANGEBYSCORE(c *storage.Cache, z, s, e string) string {
+	var result string
 
 	if (s == "max" && e == "min") || (e == "max" && s == "min") {
-		c.WithLock(func() {
+		c.WithRWLock(func() {
+			var arr []ZItem
+
 			cd, exists := c.GetUnsafe(z)
 			if !exists {
-				logger.Error("can`t find %v in memory", z)
+				// result = formatter.ErrorMessage("can`t find %v in memory", z)
+				result = formatter.Nil()
 				return
 			}
 
@@ -159,73 +190,87 @@ func ZRANGEBYSCORE(c *storage.Cache, z, s, e string) {
 
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				logger.Error("%s isn't a zset", z)
+				// result = formatter.ErrorMessage("%s isn't a zset", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 
 			if s == "max" && e == "min" {
 				for _, k := range m.Order {
-					slice = append(slice, k)
+					arr = append(arr, k)
 				}
 			} else if e == "max" && s == "min" {
 				for i := len(m.Order) - 1; i >= 0; i-- {
-					slice = append(slice, m.Order[i])
+					arr = append(arr, m.Order[i])
 				}
 			}
 
-			fmt.Println(slice)
+			result = formatter.Array(serializeZItems(arr...))
 		})
 	} else {
-		logger.Error("Invalid syntax")
+		return formatter.ErrInvalidSyntax.Error()
 	}
+
+	return result
 }
 
-func SCORE(c *storage.Cache, z, k string) {
+func SCORE(c *storage.Cache, z, k string) string {
+	var result string
+
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			logger.Error("Can`t find %v in memory", z)
+			// formatter.ErrorMessage("Can`t find %v in memory", z)
+			result = formatter.Nil()
 			return
 		} else {
 			cd.Requests++
 			if zs, ok := parseZSet(cd.Value); ok {
 				if s, ok := zs.Items[k]; ok {
-					fmt.Println(s)
+					result = formatter.Number(s)
 				} else {
-					fmt.Println(-1)
+					result = formatter.Number(-1)
 				}
 			} else {
-				logger.Error("%s isn't a zset", z)
+				formatter.ErrorMessage("%s isn't a zset", z)
 				return
 			}
 		}
 	})
+
+	return result
 }
 
-func LSCORE(c *storage.Cache, z string, ks []string) {
-	res := make([]float64, 0, len(ks))
+func LSCORE(c *storage.Cache, z string, ks []string) string {
+	var result string
 
 	c.WithLock(func() {
+		arr := make([]string, 0, len(ks))
+
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			logger.Error("Can`t find %v in memory", z)
+			// result = formatter.ErrorMessage("Can`t find %v in memory", z)
+			result = formatter.Nil()
 			return
 		} else {
 			cd.Requests++
 			if zs, ok := parseZSet(cd.Value); ok {
 				for _, k := range ks {
 					if s, ok := zs.Items[k]; ok {
-						res = append(res, s)
+						arr = append(arr, serializeFloat(s))
 					} else {
-						res = append(res, -1)
+						arr = append(arr, "-1")
 					}
 				}
 			} else {
-				logger.Error("%s isn't a zset", z)
+				// formatter.ErrorMessage("%s isn't a zset", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 		}
 
-		fmt.Println(res)
+		result = formatter.Array(serializeList(arr))
 	})
+
+	return result
 }
