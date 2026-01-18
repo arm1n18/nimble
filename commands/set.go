@@ -24,20 +24,23 @@ func serializeSet(s map[string]struct{}) string {
 	return string(b)
 }
 
-func SADD(c *storage.Cache, z string, vs ...string) string {
+func SADD(c *storage.Cache, z string, args ...string) string {
 	var result string
 
-	if len(vs) == 0 {
+	if len(args) == 0 {
 		return formatter.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
+		var q int
+
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
 			m := make(map[string]struct{})
-			for _, v := range vs {
+			for _, v := range args {
 				if _, ok := m[v]; !ok {
 					m[v] = struct{}{}
+					q++
 				}
 			}
 
@@ -47,18 +50,19 @@ func SADD(c *storage.Cache, z string, vs ...string) string {
 				Requests:  1,
 				CreatedAt: time.Now(),
 			})
-			result = formatter.Success()
+			result = formatter.Number(q)
 		} else {
 			cd.Requests++
 			if m, ok := parseSet(cd.Value); ok {
-				for _, v := range vs {
+				for _, v := range args {
 					if _, ok := m[v]; !ok {
 						m[v] = struct{}{}
+						q++
 					}
 				}
 
 				cd.Value = serializeSet(m)
-				result = formatter.Success()
+				result = formatter.Number(q)
 			} else {
 				// result = formatter.ErrorMessage("%s isn't a set", z)
 				result = formatter.ErrMismatchType.Error()
@@ -70,14 +74,16 @@ func SADD(c *storage.Cache, z string, vs ...string) string {
 	return result
 }
 
-func SREM(c *storage.Cache, z string, vs ...string) string {
+func SREM(c *storage.Cache, z string, args ...string) string {
 	var result string
 
-	if len(vs) == 0 {
+	if len(args) == 0 {
 		return formatter.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
+		var q int
+
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
 			// result = formatter.ErrorMessage("Can`t find %v in memory", z)
@@ -87,11 +93,14 @@ func SREM(c *storage.Cache, z string, vs ...string) string {
 			cd.Requests++
 
 			if m, ok := parseSet(cd.Value); ok {
-				for _, v := range vs {
-					delete(m, v)
+				for _, v := range args {
+					if _, exists := m[v]; exists {
+						delete(m, v)
+						q++
+					}
 				}
 				cd.Value = serializeSet(m)
-				result = formatter.Success()
+				result = formatter.Number(q)
 			} else {
 				// result = formatter.ErrorMessage("%s isn't a set", z)
 				result = formatter.ErrMismatchType.Error()
@@ -103,7 +112,7 @@ func SREM(c *storage.Cache, z string, vs ...string) string {
 	return result
 }
 
-func SCONTAINS(c *storage.Cache, z string, vs ...string) string {
+func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 	var result string
 
 	c.WithRWLock(func() {
@@ -111,7 +120,7 @@ func SCONTAINS(c *storage.Cache, z string, vs ...string) string {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
 			// result = formatter.ErrorMessage("can`t find %v in memory", z)
-			result = formatter.Nil()
+			result = formatter.Number(-1)
 			return
 		}
 
@@ -125,7 +134,7 @@ func SCONTAINS(c *storage.Cache, z string, vs ...string) string {
 				result = formatter.ErrMismatchType.Error()
 				return
 			}
-			for _, v := range vs {
+			for _, v := range args {
 				if _, ok := m[v]; ok {
 					q++
 				}
@@ -139,7 +148,7 @@ func SCONTAINS(c *storage.Cache, z string, vs ...string) string {
 				result = formatter.ErrMismatchType.Error()
 				return
 			}
-			for _, v := range vs {
+			for _, v := range args {
 				if _, ok := m.Items[v]; ok {
 					q++
 				}
@@ -156,16 +165,16 @@ func SCONTAINS(c *storage.Cache, z string, vs ...string) string {
 	return result
 }
 
-func LSCONTAINS(c *storage.Cache, z string, vs ...string) string {
+func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 	var result string
 
 	c.WithRWLock(func() {
-		arr := make([]string, len(vs))
+		arr := make([]string, len(args))
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
 			// result = formatter.ErrorMessage("can`t find %v in memory", z)
-			result = formatter.Nil()
+			result = formatter.Array("[]")
 			return
 		}
 
@@ -179,7 +188,7 @@ func LSCONTAINS(c *storage.Cache, z string, vs ...string) string {
 				result = formatter.ErrMismatchType.Error()
 				return
 			}
-			for i, v := range vs {
+			for i, v := range args {
 				if _, ok := m[v]; ok {
 					arr[i] = "1"
 				} else {
@@ -195,7 +204,7 @@ func LSCONTAINS(c *storage.Cache, z string, vs ...string) string {
 				result = formatter.ErrMismatchType.Error()
 				return
 			}
-			for i, v := range vs {
+			for i, v := range args {
 				if _, ok := m.Items[v]; ok {
 					arr[i] = "1"
 				} else {
@@ -263,7 +272,7 @@ func SMEMBERS(c *storage.Cache, z string) string {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
 			// result = formatter.ErrorMessage("can`t find %v in memory", z)
-			// result = formatter.Nil()
+			result = formatter.Array("[]")
 			return
 		}
 

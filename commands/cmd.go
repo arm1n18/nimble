@@ -11,12 +11,12 @@ import (
 	"time"
 )
 
-func getKeysByPattern(m map[string]*storage.CacheData, pattern string, lim int) []string {
-	var kvs []string
+func geteysByPattern(m map[string]*storage.CacheData, pattern string, lim int) []string {
+	var args []string
 
 	symbol, ok := utils.GetPatternSymbol(pattern)
 	if !ok {
-		return kvs
+		return args
 	}
 
 	switch symbol {
@@ -29,8 +29,8 @@ func getKeysByPattern(m map[string]*storage.CacheData, pattern string, lim int) 
 				}
 
 				if match {
-					kvs = append(kvs, k)
-					if lim > 0 && len(kvs) >= lim {
+					args = append(args, k)
+					if lim > 0 && len(args) >= lim {
 						break
 					}
 				}
@@ -45,8 +45,8 @@ func getKeysByPattern(m map[string]*storage.CacheData, pattern string, lim int) 
 				}
 
 				if match && len(pattern) == len(k) {
-					kvs = append(kvs, k)
-					if lim > 0 && len(kvs) >= lim {
+					args = append(args, k)
+					if lim > 0 && len(args) >= lim {
 						break
 					}
 				}
@@ -54,7 +54,7 @@ func getKeysByPattern(m map[string]*storage.CacheData, pattern string, lim int) 
 		}
 	}
 
-	return kvs
+	return args
 }
 
 // Store data of string type in the cache
@@ -81,16 +81,16 @@ func SET(c *storage.Cache, k, v string) string {
 }
 
 // Store data of string type in the cache
-func MSET(c *storage.Cache, kvs ...string) string {
+func MSET(c *storage.Cache, args ...string) string {
 	var result string
 
-	if len(kvs)%2 == 0 && len(kvs) != 0 {
+	if len(args)%2 == 0 && len(args) != 0 {
 		// if ok := removeQuotes(&s, 1, 1); !ok {
 		// 	return
 		// }
 
-		for i := 0; i < len(kvs); i += 2 {
-			k, _ := kvs[i], kvs[i+1]
+		for i := 0; i < len(args); i += 2 {
+			k, _ := args[i], args[i+1]
 
 			if k == "" || k == "*" {
 				return formatter.ErrWrongKey.Error()
@@ -98,8 +98,9 @@ func MSET(c *storage.Cache, kvs ...string) string {
 		}
 
 		c.WithLock(func() {
-			for i := 0; i < len(kvs); i += 2 {
-				k, v := kvs[i], kvs[i+1]
+
+			for i := 0; i < len(args); i += 2 {
+				k, v := args[i], args[i+1]
 
 				c.SetUnsafe(k, &storage.CacheData{
 					Value:     v,
@@ -123,7 +124,7 @@ func MSET(c *storage.Cache, kvs ...string) string {
 func GET(c *storage.Cache, k string) string {
 	var result string
 
-	c.WithLock(func() {
+	c.WithRWLock(func() {
 		if cd, exists := c.GetUnsafe(k); exists {
 			cd.Requests++
 
@@ -152,17 +153,13 @@ func GET(c *storage.Cache, k string) string {
 }
 
 // Get string type of data from the cache
-func MGET(c *storage.Cache, kvs ...string) string {
+func MGET(c *storage.Cache, args ...string) string {
 	var result string
 
-	c.WithLock(func() {
+	c.WithRWLock(func() {
 		var arr []string
 
-		if len(kvs) != 1 {
-			arr = make([]string, 0, len(kvs))
-		}
-
-		for _, k := range kvs {
+		for _, k := range args {
 			if cd, exists := c.GetUnsafe(k); exists {
 				cd.Requests++
 
@@ -185,22 +182,22 @@ func MGET(c *storage.Cache, kvs ...string) string {
 			}
 		}
 
-		result = serializeList(arr)
+		result = formatter.Array(serializeList(arr))
 	})
 
 	return result
 }
 
 // Remove any type of data from the cache
-func DEL(c *storage.Cache, ks ...string) string {
+func DEL(c *storage.Cache, args ...string) string {
 	var result string
 	var q int
 
-	if len(ks) == 0 {
+	if len(args) == 0 {
 		return formatter.ErrNotEnoughValues.Error()
 	}
 
-	if len(ks) == 1 && ks[0] == "*" {
+	if len(args) == 1 && args[0] == "*" {
 		c.WithRWLock(func() {
 			cd := c.GetData()
 			q = len(cd)
@@ -211,7 +208,7 @@ func DEL(c *storage.Cache, ks ...string) string {
 	}
 
 	c.WithLock(func() {
-		for _, k := range ks {
+		for _, k := range args {
 			if _, exists := c.GetUnsafe(k); exists {
 				delete(c.GetData(), k)
 				q++
@@ -225,22 +222,22 @@ func DEL(c *storage.Cache, ks ...string) string {
 }
 
 // Copy data from one structure to another
-func COPY(c *storage.Cache, k1, k2 string) string {
+func COPY(c *storage.Cache, f, t string) string {
 	var result string
 
-	if len(k1) == 0 || len(k2) == 0 || k1 == "*" || k2 == "*" {
+	if len(f) == 0 || len(t) == 0 || f == "*" || t == "*" {
 		return formatter.ErrWrongKey.Error()
 	}
 
 	c.WithLock(func() {
-		cd, exists := c.GetUnsafe(k1)
+		cd, exists := c.GetUnsafe(f)
 		if !exists {
-			// result = formatter.ErrorMessage("Can`t find %v in memory", k1)
+			// result = formatter.ErrorMessage("Can`t find %v in memory", f)
 			result = formatter.Failure()
 			return
 		}
 
-		c.SetPartialUnsafe(k2, storage.CacheDataUpdate{Value: &cd.Value, Type: &cd.Type})
+		c.SetPartialUnsafe(t, storage.CacheDataUpdate{Value: &cd.Value, Type: &cd.Type})
 
 		result = formatter.Success()
 	})
@@ -379,7 +376,7 @@ func TTL(c *storage.Cache, k string) string {
 Count how many keys exist in the cache
 
 Description:
-Checkvs one or more keys in the cache and returns the total number of kesy that exist.
+Checargs one or more keys in the cache and returns the total number of kesy that exist.
 
 Example:
 
@@ -389,14 +386,14 @@ Example:
 
   - Explanation: (KEY_1 exists, KEY_2 exists, KEY_0 does not exist)
 */
-func EXISTS(c *storage.Cache, kvs ...string) string {
+func EXISTS(c *storage.Cache, args ...string) string {
 	var result string
 
 	c.WithRWLock(func() {
 		var q int
 		cd := c.GetData()
 
-		for _, k := range kvs {
+		for _, k := range args {
 			if _, exists := cd[k]; exists {
 				q++
 			}
@@ -412,7 +409,7 @@ func EXISTS(c *storage.Cache, kvs ...string) string {
 Check if the keys exist and return array.
 
 Description:
-Checkvs one or more keys in the cache and returns an array of integers.
+Checargs one or more keys in the cache and returns an array of integers.
 
 Behavior:
   - For each key provided:
@@ -427,14 +424,14 @@ Example:
 
   - Explanation: (KEY_1 exists, KEY_2 exists, KEY_0 does not exist)
 */
-func LEXISTS(c *storage.Cache, kvs ...string) string {
+func LEXISTS(c *storage.Cache, args ...string) string {
 	var result string
 
 	c.WithRWLock(func() {
-		arr := make([]string, len(kvs))
+		arr := make([]string, len(args))
 		cd := c.GetData()
 
-		for i, k := range kvs {
+		for i, k := range args {
 			if _, exists := cd[k]; exists {
 				arr[i] = "1"
 			} else {
@@ -489,36 +486,36 @@ func KEYS(c *storage.Cache, args ...string) string {
 	}
 
 	if utils.IsPatternCmd(args[0]) {
-		c.WithLock(func() {
-			result = formatter.Array(serializeList(getKeysByPattern(c.GetData(), args[0], d)))
+		c.WithRWLock(func() {
+			result = formatter.Array(serializeList(geteysByPattern(c.GetData(), args[0], d)))
 		})
 	}
 
 	return result
 }
 
-func RENAME(c *storage.Cache, sK, tK string) string {
+func RENAME(c *storage.Cache, f, t string) string {
 	var result string
 
 	c.WithLock(func() {
-		sCd, exists := c.GetUnsafe(sK)
+		sCd, exists := c.GetUnsafe(f)
 		if !exists {
-			// result = formatter.ErrorMessage("can`t find %v in memory", sK)
+			// result = formatter.ErrorMessage("can`t find %v in memory", f)
 			result = formatter.Failure()
 			return
 		}
 
-		_, exists = c.GetUnsafe(tK)
+		_, exists = c.GetUnsafe(t)
 		if exists {
-			// result = formatter.ErrorMessage("%v already exists", tK)
+			// result = formatter.ErrorMessage("%v already exists", t)
 			result = formatter.Failure()
 			return
 		}
 
 		d := c.GetData()
 
-		delete(d, sK)
-		c.SetUnsafe(tK, sCd)
+		delete(d, f)
+		c.SetUnsafe(t, sCd)
 
 		result = formatter.Success()
 	})

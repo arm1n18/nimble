@@ -25,10 +25,10 @@ func serializeHash(m map[string]string) string {
 }
 
 // Store hashset in the cache
-func HSET(c *storage.Cache, h string, kv ...string) string {
+func HSET(c *storage.Cache, h string, args ...string) string {
 	var result string
 
-	if len(kv)%2 == 0 && len(kv) != 0 {
+	if len(args)%2 == 0 && len(args) != 0 {
 
 		// if ok := removeQuotes(&s, 0, 1); !ok {
 		// 	return
@@ -41,8 +41,8 @@ func HSET(c *storage.Cache, h string, kv ...string) string {
 				cd.Requests++
 
 				if m, ok := parseHash(cd.Value); ok {
-					for i := 0; i < len(kv); i += 2 {
-						m[kv[i]] = kv[i+1]
+					for i := 0; i < len(args); i += 2 {
+						m[args[i]] = args[i+1]
 					}
 
 					c.SetUnsafe(h, &storage.CacheData{
@@ -56,8 +56,8 @@ func HSET(c *storage.Cache, h string, kv ...string) string {
 				}
 			}
 
-			for i := 0; i < len(kv); i += 2 {
-				hash[kv[i]] = kv[i+1]
+			for i := 0; i < len(args); i += 2 {
+				hash[args[i]] = args[i+1]
 			}
 
 			c.SetUnsafe(h, &storage.CacheData{
@@ -80,13 +80,13 @@ func HSET(c *storage.Cache, h string, kv ...string) string {
 func HGET(c *storage.Cache, h string, ks ...string) string {
 	var result string
 
-	c.WithLock(func() {
+	c.WithRWLock(func() {
 		arr := make([]string, len(ks))
 
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
 			// todocmd
-			result = formatter.Nil()
+			result = formatter.Array("[]")
 			return
 		}
 
@@ -117,10 +117,10 @@ func HGET(c *storage.Cache, h string, ks ...string) string {
 func HKEYS(c *storage.Cache, h string) string {
 	var result string
 
-	c.WithLock(func() {
+	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = formatter.Nil()
+			result = formatter.Array("[]")
 			return
 		}
 
@@ -148,11 +148,11 @@ func HKEYS(c *storage.Cache, h string) string {
 func HVALUES(c *storage.Cache, h string) string {
 	var result string
 
-	c.WithLock(func() {
+	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
 			// result = formatter.ErrorMessage("can`t find %v in memory", h)
-			result = formatter.Nil()
+			result = formatter.Array("[]")
 			return
 		}
 
@@ -177,10 +177,10 @@ func HVALUES(c *storage.Cache, h string) string {
 }
 
 // Get hashset data from the cache by key
-func HDEL(c *storage.Cache, h string, kv ...string) string {
+func HDEL(c *storage.Cache, h string, args ...string) string {
 	var result string
 
-	if len(kv) == 0 {
+	if len(args) == 0 {
 		return formatter.ErrNotEnoughValues.Error()
 	}
 
@@ -190,7 +190,7 @@ func HDEL(c *storage.Cache, h string, kv ...string) string {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
 			// result = formatter.ErrorMessage("can`t find %v in memory", h)
-			result = formatter.Nil()
+			result = formatter.Number(-1)
 			return
 		}
 
@@ -203,7 +203,7 @@ func HDEL(c *storage.Cache, h string, kv ...string) string {
 			return
 		}
 
-		for _, k := range kv {
+		for _, k := range args {
 			if _, exists := m[k]; exists {
 				delete(m, k)
 				q++
@@ -222,7 +222,7 @@ func HDEL(c *storage.Cache, h string, kv ...string) string {
 }
 
 // Check if the keys exist in the hashset and return their quantity
-func HCONTAINS(c *storage.Cache, h string, kv ...string) string {
+func HCONTAINS(c *storage.Cache, h string, args ...string) string {
 	var result string
 
 	c.WithRWLock(func() {
@@ -231,7 +231,7 @@ func HCONTAINS(c *storage.Cache, h string, kv ...string) string {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
 			result = formatter.ErrorMessage("can`t find %v in memory", h)
-			result = formatter.Nil()
+			result = formatter.Number(-1)
 			return
 		}
 
@@ -244,7 +244,7 @@ func HCONTAINS(c *storage.Cache, h string, kv ...string) string {
 			return
 		}
 
-		for _, k := range kv {
+		for _, k := range args {
 			if _, exists := m[k]; exists {
 				q++
 			}
@@ -257,15 +257,15 @@ func HCONTAINS(c *storage.Cache, h string, kv ...string) string {
 }
 
 // Check if the keys exist in the hashset and return array
-func LHCONTAINS(c *storage.Cache, h string, kv ...string) string {
+func LHCONTAINS(c *storage.Cache, h string, args ...string) string {
 	var result string
 
 	c.WithRWLock(func() {
-		arr := make([]string, len(kv))
+		arr := make([]string, len(args))
 
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = formatter.Nil()
+			result = formatter.Array("[]")
 			return
 		}
 
@@ -278,7 +278,7 @@ func LHCONTAINS(c *storage.Cache, h string, kv ...string) string {
 			return
 		}
 
-		for i, k := range kv {
+		for i, k := range args {
 			if _, exists := m[k]; exists {
 				arr[i] = "1"
 			} else {
@@ -299,7 +299,7 @@ func HLEN(c *storage.Cache, h string) string {
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = formatter.Nil()
+			result = formatter.Number(-1)
 			return
 		}
 

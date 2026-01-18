@@ -182,7 +182,7 @@ func ZRANGEBYSCORE(c *storage.Cache, z, s, e string) string {
 			cd, exists := c.GetUnsafe(z)
 			if !exists {
 				// result = formatter.ErrorMessage("can`t find %v in memory", z)
-				result = formatter.Nil()
+				result = formatter.Array("[]")
 				return
 			}
 
@@ -217,11 +217,11 @@ func ZRANGEBYSCORE(c *storage.Cache, z, s, e string) string {
 func SCORE(c *storage.Cache, z, k string) string {
 	var result string
 
-	c.WithLock(func() {
+	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
 			// formatter.ErrorMessage("Can`t find %v in memory", z)
-			result = formatter.Nil()
+			result = formatter.Number(-1)
 			return
 		} else {
 			cd.Requests++
@@ -232,7 +232,8 @@ func SCORE(c *storage.Cache, z, k string) string {
 					result = formatter.Number(-1)
 				}
 			} else {
-				formatter.ErrorMessage("%s isn't a zset", z)
+				// formatter.ErrorMessage("%s isn't a zset", z)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 		}
@@ -244,13 +245,13 @@ func SCORE(c *storage.Cache, z, k string) string {
 func LSCORE(c *storage.Cache, z string, ks []string) string {
 	var result string
 
-	c.WithLock(func() {
+	c.WithRWLock(func() {
 		arr := make([]string, 0, len(ks))
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
 			// result = formatter.ErrorMessage("Can`t find %v in memory", z)
-			result = formatter.Nil()
+			result = formatter.Array("[]")
 			return
 		} else {
 			cd.Requests++

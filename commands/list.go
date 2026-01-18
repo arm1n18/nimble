@@ -62,7 +62,8 @@ func LSET(c *storage.Cache, l string, s ...string) string {
 			var ok bool
 			arr, ok = parseList(cd.Value)
 			if !ok {
-				result = formatter.ErrorMessage("%s isn`t list", l)
+				// result = formatter.ErrorMessage("%s isn`t list", l)
+				result = formatter.ErrMismatchType.Error()
 				return
 			}
 		}
@@ -117,11 +118,11 @@ func LGET(c *storage.Cache, l string, s ...string) string {
 		return formatter.ErrNotEnoughValues.Error()
 	}
 
-	c.WithLock(func() {
+	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
 			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
-			result = formatter.Nil()
+			result = formatter.Array("[]")
 			return
 		} else {
 			list, ok := parseList(cd.Value)
@@ -266,6 +267,11 @@ func SPOP(c *storage.Cache, l, s string) string {
 			return
 		}
 
+		if len(list) == 0 {
+			result = formatter.Array("[]")
+			return
+		}
+
 		if len(list) < q {
 			q = len(list)
 		}
@@ -309,6 +315,11 @@ func EPOP(c *storage.Cache, l, s string) string {
 			return
 		}
 
+		if len(list) == 0 {
+			result = formatter.Array("[]")
+			return
+		}
+
 		if q > len(list) {
 			q = len(list)
 		}
@@ -348,7 +359,7 @@ func SRANGE(c *storage.Cache, l string, s []string) string {
 
 		if !exists {
 			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
-			result = formatter.Nil()
+			result = formatter.Array("[]")
 			return
 		}
 
@@ -396,7 +407,7 @@ func CONTAINS(c *storage.Cache, l string, ks []string) string {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
 			// result = formatter.ErrorMessage("can`t find %v in memory", l)
-			result = formatter.Number(-1)
+			result = formatter.Number(0)
 			return
 		}
 
@@ -434,7 +445,7 @@ func LCONTAINS(c *storage.Cache, l string, ks []string) string {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
 			// result = formatter.ErrorMessage("can`t find %v in memory", l)
-			result = formatter.Nil()
+			result = formatter.Array("[]")
 			return
 		}
 

@@ -19,13 +19,13 @@ func MAXMEM(c *storage.Cache, n string) {
 }
 
 // Check if the memory sizes of the data are equal
-func COMPARE(c *storage.Cache, ks []string) string {
+func COMPARE(c *storage.Cache, args ...string) string {
 	var result string
 
 	c.WithRWLock(func() {
 		cd := c.GetData()
 
-		for _, k := range ks {
+		for _, k := range args {
 			_, exists := cd[k]
 			if !exists {
 				result = formatter.ErrorMessage("Can`t find %v in memory", k)
@@ -33,20 +33,20 @@ func COMPARE(c *storage.Cache, ks []string) string {
 			}
 		}
 
-		result = fmt.Sprint(unsafe.Sizeof(*cd[ks[0]]) == unsafe.Sizeof(*cd[ks[1]]))
+		result = fmt.Sprint(unsafe.Sizeof(*cd[args[0]]) == unsafe.Sizeof(*cd[args[1]]))
 	})
 
 	return result
 }
 
 // Check the memory size of the data
-func SIZEOF(c *storage.Cache, ks []string) {
+func SIZEOF(c *storage.Cache, args ...string) {
 	c.WithLock(func() {
 		cd := c.GetData()
 
 		// TODO
 		var b uint64
-		if len(ks) == 1 && ks[0] == "*" {
+		if len(args) == 1 && args[0] == "*" {
 			for _, k := range cd {
 				b += uint64(unsafe.Sizeof(*k))
 			}
@@ -54,7 +54,7 @@ func SIZEOF(c *storage.Cache, ks []string) {
 			return
 		}
 
-		for _, k := range ks {
+		for _, k := range args {
 			// cd, exists := cd[k]
 			// if !exists {
 			// 	formatter.ErrorMessage("Can`t find %v in memory", k)

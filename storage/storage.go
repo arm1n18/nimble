@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"log"
 	"sync"
 	"time"
 )
@@ -109,7 +108,6 @@ func (c *Cache) SetUnsafe(k string, v *CacheData) {
 func (c *Cache) SetPartialUnsafe(k string, nD CacheDataUpdate) {
 	cd, exists := c.GetUnsafe(k)
 	if !exists {
-		log.Printf("Can`t find %v in memory", k)
 		return
 	}
 

@@ -101,7 +101,7 @@ func handleCommand(c *storage.Cache, s *secure.Session, str string) string {
 			return formatter.ErrInvalidSyntax.Error()
 		}
 
-		cmd.MGET(c, cmdArgs...)
+		return cmd.MGET(c, cmdArgs...)
 	case "KEYS":
 		if len(cmdArgs) == 0 {
 			return formatter.ErrInvalidSyntax.Error()
@@ -258,12 +258,12 @@ func handleCommand(c *storage.Cache, s *secure.Session, str string) string {
 
 		res := regexp.MustCompile(`"[^"]*"|\S+`)
 		matches := res.FindAllString(strings.Join(cmdArgs, " "), -1)
-		cmd.LGET(c, cmdArgs[0], matches[1:]...)
+		return cmd.LGET(c, cmdArgs[0], matches[1:]...)
 	case "LCLEAR":
 		if len(cmdArgs) > 1 {
 			return formatter.ErrInvalidSyntax.Error()
 		}
-		cmd.LCLEAR(c, cmdArgs[0])
+		return cmd.LCLEAR(c, cmdArgs[0])
 	case "LLEN":
 		if len(cmdArgs) > 1 {
 			return formatter.ErrInvalidSyntax.Error()
@@ -288,7 +288,7 @@ func handleCommand(c *storage.Cache, s *secure.Session, str string) string {
 		res := regexp.MustCompile(`"[^"]*"|\S+`)
 		matches := res.FindAllString(strings.Join(cmdArgs, " "), -1)
 		return secure.ReadOnlyMiddleware(c, func() string {
-			return cmd.SPUSH(c, cmdArgs[0], matches[1:]...)
+			return cmd.EPUSH(c, cmdArgs[0], matches[1:]...)
 		})
 	case "SPOP":
 		if len(cmdArgs) > 2 {
@@ -316,7 +316,7 @@ func handleCommand(c *storage.Cache, s *secure.Session, str string) string {
 		if len(cmdArgs) != 3 {
 			return formatter.ErrInvalidSyntax.Error()
 		}
-		cmd.SRANGE(c, cmdArgs[0], cmdArgs[1:])
+		return cmd.SRANGE(c, cmdArgs[0], cmdArgs[1:])
 	case "TTK":
 		if len(cmdArgs) != 2 {
 			return formatter.ErrInvalidSyntax.Error()
@@ -335,7 +335,7 @@ func handleCommand(c *storage.Cache, s *secure.Session, str string) string {
 		if len(cmdArgs) > 2 {
 			return formatter.ErrInvalidSyntax.Error()
 		}
-		cmd.COMPARE(c, cmdArgs)
+		return cmd.COMPARE(c, cmdArgs...)
 	case "LIST":
 		return cmd.LIST(c)
 	case "LISTLEN":
@@ -461,8 +461,6 @@ func handleCommand(c *storage.Cache, s *secure.Session, str string) string {
 		// fmt.Println("\033[33;1mUnknown command (type \\HELP)\033[0m")
 		return "Unknown command (type \\HELP)"
 	}
-
-	return ""
 }
 
 func main() {
