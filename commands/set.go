@@ -2,7 +2,7 @@ package commands
 
 import (
 	"encoding/json"
-	"nimble/formatter"
+	"nimble/protocol"
 	"nimble/storage"
 	"time"
 )
@@ -28,7 +28,7 @@ func SADD(c *storage.Cache, z string, args ...string) string {
 	var result string
 
 	if len(args) == 0 {
-		return formatter.ErrNotEnoughValues.Error()
+		return protocol.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
@@ -50,7 +50,7 @@ func SADD(c *storage.Cache, z string, args ...string) string {
 				Requests:  1,
 				CreatedAt: time.Now(),
 			})
-			result = formatter.Number(q)
+			result = protocol.Number(q)
 		} else {
 			cd.Requests++
 			if m, ok := parseSet(cd.Value); ok {
@@ -62,10 +62,10 @@ func SADD(c *storage.Cache, z string, args ...string) string {
 				}
 
 				cd.Value = serializeSet(m)
-				result = formatter.Number(q)
+				result = protocol.Number(q)
 			} else {
-				// result = formatter.ErrorMessage("%s isn't a set", z)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("%s isn't a set", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 		}
@@ -78,7 +78,7 @@ func SREM(c *storage.Cache, z string, args ...string) string {
 	var result string
 
 	if len(args) == 0 {
-		return formatter.ErrNotEnoughValues.Error()
+		return protocol.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
@@ -86,8 +86,8 @@ func SREM(c *storage.Cache, z string, args ...string) string {
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = formatter.ErrorMessage("Can`t find %v in memory", z)
-			result = formatter.Failure()
+			// result = protocol.ErrorMessage("Can`t find %v in memory", z)
+			result = protocol.Failure()
 			return
 		} else {
 			cd.Requests++
@@ -100,10 +100,10 @@ func SREM(c *storage.Cache, z string, args ...string) string {
 					}
 				}
 				cd.Value = serializeSet(m)
-				result = formatter.Number(q)
+				result = protocol.Number(q)
 			} else {
-				// result = formatter.ErrorMessage("%s isn't a set", z)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("%s isn't a set", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 		}
@@ -119,8 +119,8 @@ func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 		var q int
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = formatter.ErrorMessage("can`t find %v in memory", z)
-			result = formatter.Number(-1)
+			// result = protocol.ErrorMessage("can`t find %v in memory", z)
+			result = protocol.Number(-1)
 			return
 		}
 
@@ -130,8 +130,8 @@ func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("can't parse set: %s", z)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("can't parse set: %s", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 			for _, v := range args {
@@ -140,12 +140,12 @@ func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 				}
 			}
 
-			result = formatter.Number(q)
+			result = protocol.Number(q)
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("can't parse zset: %s", z)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("can't parse zset: %s", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 			for _, v := range args {
@@ -154,10 +154,10 @@ func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 				}
 			}
 
-			result = formatter.Number(q)
+			result = protocol.Number(q)
 		default:
-			// result = formatter.ErrorMessage("%s isn't a set", z)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn't a set", z)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 	})
@@ -173,8 +173,8 @@ func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = formatter.ErrorMessage("can`t find %v in memory", z)
-			result = formatter.Array("[]")
+			// result = protocol.ErrorMessage("can`t find %v in memory", z)
+			result = protocol.Array("[]")
 			return
 		}
 
@@ -184,8 +184,8 @@ func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("can't parse set: %s", z)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("can't parse set: %s", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 			for i, v := range args {
@@ -196,12 +196,12 @@ func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 				}
 			}
 
-			result = formatter.Array(serializeList(arr))
+			result = protocol.Array(serializeList(arr))
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("can't parse zset: %s", z)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("can't parse zset: %s", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 			for i, v := range args {
@@ -212,10 +212,10 @@ func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 				}
 			}
 
-			result = formatter.Array(serializeList(arr))
+			result = protocol.Array(serializeList(arr))
 		default:
-			// result = formatter.ErrorMessage("%s isn't a set", z)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn't a set", z)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 	})
@@ -229,8 +229,8 @@ func SLEN(c *storage.Cache, z string) string {
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = formatter.ErrorMessage("can`t find %v in memory", z)
-			result = formatter.Number(-1)
+			// result = protocol.ErrorMessage("can`t find %v in memory", z)
+			result = protocol.Number(-1)
 			return
 		}
 
@@ -240,22 +240,22 @@ func SLEN(c *storage.Cache, z string) string {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("can't parse set: %s", z)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("can't parse set: %s", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
-			result = formatter.Number(len(m))
+			result = protocol.Number(len(m))
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("can't parse zset: %s", z)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("can't parse zset: %s", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
-			result = formatter.Number(len(m.Items))
+			result = protocol.Number(len(m.Items))
 		default:
-			// result = formatter.ErrorMessage("%s isn't a set", z)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn't a set", z)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 	})
@@ -271,8 +271,8 @@ func SMEMBERS(c *storage.Cache, z string) string {
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = formatter.ErrorMessage("can`t find %v in memory", z)
-			result = formatter.Array("[]")
+			// result = protocol.ErrorMessage("can`t find %v in memory", z)
+			result = protocol.Array("[]")
 			return
 		}
 
@@ -282,20 +282,20 @@ func SMEMBERS(c *storage.Cache, z string) string {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("can't parse set: %s", z)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("can't parse set: %s", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 			for k := range m {
 				arr = append(arr, k)
 			}
 
-			result = formatter.Array(serializeList(arr))
+			result = protocol.Array(serializeList(arr))
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("can't parse zset: %s", z)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("can't parse zset: %s", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 
@@ -303,10 +303,10 @@ func SMEMBERS(c *storage.Cache, z string) string {
 				arr = append(arr, k.Member)
 			}
 
-			result = formatter.Array(serializeList(arr))
+			result = protocol.Array(serializeList(arr))
 		default:
-			// result = formatter.ErrorMessage("%s isn't a set", z)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn't a set", z)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 	})

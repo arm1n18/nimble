@@ -1,4 +1,4 @@
-package formatter
+package protocol
 
 import "fmt"
 
@@ -19,3 +19,4 @@ var ErrInvalidSyntax = Error{Code: "INVALID_SYNTAX", Message: "cmd has invalid s
 var ErrMismatchType = Error{Code: "MISMATCH_TYPE", Message: "value doesn`t match stored type"}
 var ErrInvalidRange = Error{Code: "INVALID_RANGE", Message: "range is invalid"}
 var ErrInvalidScore = Error{Code: "INVALID_SCORE", Message: "score must be >= 0"}
+var ErrReadOnly = Error{Code: "READ_ONLY", Message: "server in read-only mode"}

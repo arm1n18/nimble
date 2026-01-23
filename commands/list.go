@@ -2,7 +2,7 @@ package commands
 
 import (
 	"encoding/json"
-	"nimble/formatter"
+	"nimble/protocol"
 	"nimble/storage"
 	"strconv"
 	"time"
@@ -36,7 +36,7 @@ func ESET(c *storage.Cache, l string) string {
 			CreatedAt: time.Now(),
 		})
 
-		result = formatter.Success()
+		result = protocol.Success()
 	})
 
 	return result
@@ -47,7 +47,7 @@ func LSET(c *storage.Cache, l string, s ...string) string {
 	var result string
 
 	if len(s) == 0 || len(s)%2 != 0 {
-		return formatter.ErrNotEnoughValues.Error()
+		return protocol.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
@@ -62,8 +62,8 @@ func LSET(c *storage.Cache, l string, s ...string) string {
 			var ok bool
 			arr, ok = parseList(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("%s isn`t list", l)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("%s isn`t list", l)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 		}
@@ -71,14 +71,14 @@ func LSET(c *storage.Cache, l string, s ...string) string {
 		for i := 0; i < len(s); i += 2 {
 			index, err := strconv.Atoi(s[i])
 			if err != nil {
-				// result = formatter.ErrorMessage("Index must be a number: %s", s[i])
-				// result = formatter.ErrNotANumber.Error()
+				// result = protocol.ErrorMessage("Index must be a number: %s", s[i])
+				// result = protocol.ErrNotANumber.Error()
 				continue
 			}
 
 			if index < 0 {
-				// result = formatter.ErrorMessage("Index out of range: %v", index)
-				result = formatter.ErrInvalidRange.Error()
+				// result = protocol.ErrorMessage("Index out of range: %v", index)
+				result = protocol.ErrInvalidRange.Error()
 				continue
 			}
 
@@ -104,7 +104,7 @@ func LSET(c *storage.Cache, l string, s ...string) string {
 			cd.Requests++
 		}
 
-		result = formatter.Number(q)
+		result = protocol.Number(q)
 	})
 
 	return result
@@ -115,20 +115,20 @@ func LGET(c *storage.Cache, l string, s ...string) string {
 	var result string
 
 	if len(s) == 0 {
-		return formatter.ErrNotEnoughValues.Error()
+		return protocol.ErrNotEnoughValues.Error()
 	}
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
-			result = formatter.Array("[]")
+			// result = protocol.ErrorMessage("Can`t find %v in memory", l)
+			result = protocol.Array("[]")
 			return
 		} else {
 			list, ok := parseList(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("%s isn`t list", l)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("%s isn`t list", l)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 
@@ -136,20 +136,20 @@ func LGET(c *storage.Cache, l string, s ...string) string {
 			for _, v := range s {
 				index, err := strconv.Atoi(v)
 				if err != nil {
-					// result = formatter.ErrorMessage("Index must be a number: %s", s[i])
-					// result = formatter.ErrNotANumber.Error()
+					// result = protocol.ErrorMessage("Index must be a number: %s", s[i])
+					// result = protocol.ErrNotANumber.Error()
 					return
 				}
 
 				if index < 0 || index >= len(list) {
-					res = append(res, formatter.Nil())
+					res = append(res, protocol.Nil())
 					continue
 				}
 
 				res = append(res, list[index])
 			}
 
-			result = formatter.Array(serializeList(res))
+			result = protocol.Array(serializeList(res))
 		}
 	})
 
@@ -161,7 +161,7 @@ func SPUSH(c *storage.Cache, l string, s ...string) string {
 	var result string
 
 	if len(s) == 0 {
-		return formatter.ErrNotEnoughValues.Error()
+		return protocol.ErrNotEnoughValues.Error()
 	}
 
 	// if ok := removeQuotes(&s, 0, 1); !ok {
@@ -183,8 +183,8 @@ func SPUSH(c *storage.Cache, l string, s ...string) string {
 		} else {
 			arr, ok := parseList(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("%s isn`t list", l)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("%s isn`t list", l)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 
@@ -193,7 +193,7 @@ func SPUSH(c *storage.Cache, l string, s ...string) string {
 			cd.Requests++
 		}
 
-		result = formatter.Number(len(s))
+		result = protocol.Number(len(s))
 	})
 
 	return result
@@ -204,7 +204,7 @@ func EPUSH(c *storage.Cache, l string, s ...string) string {
 	var result string
 
 	if len(s) == 0 {
-		return formatter.ErrNotEnoughValues.Error()
+		return protocol.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
@@ -222,8 +222,8 @@ func EPUSH(c *storage.Cache, l string, s ...string) string {
 		} else {
 			arr, ok := parseList(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("%s isn`t list", l)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("%s isn`t list", l)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 
@@ -232,7 +232,7 @@ func EPUSH(c *storage.Cache, l string, s ...string) string {
 			cd.Requests++
 		}
 
-		result = formatter.Number(len(s))
+		result = protocol.Number(len(s))
 	})
 
 	return result
@@ -248,27 +248,27 @@ func SPOP(c *storage.Cache, l, s string) string {
 		var err error
 		q, err = strconv.Atoi(s)
 		if err != nil {
-			return formatter.ErrNotANumber.Error()
+			return protocol.ErrNotANumber.Error()
 		}
 	}
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
-			result = formatter.Failure()
+			// result = protocol.ErrorMessage("Can`t find %v in memory", l)
+			result = protocol.Failure()
 			return
 		}
 
 		list, ok := parseList(cd.Value)
 		if !ok {
-			// formatter.ErrorMessage("%s isn`t list", l)
-			result = formatter.ErrMismatchType.Error()
+			// protocol.ErrorMessage("%s isn`t list", l)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
 		if len(list) == 0 {
-			result = formatter.Array("[]")
+			result = protocol.Array("[]")
 			return
 		}
 
@@ -280,7 +280,7 @@ func SPOP(c *storage.Cache, l, s string) string {
 		cd.Value = serializeList(list[q:])
 		cd.Requests++
 
-		result = formatter.Array(serializeList(rm))
+		result = protocol.Array(serializeList(rm))
 	})
 
 	return result
@@ -296,27 +296,27 @@ func EPOP(c *storage.Cache, l, s string) string {
 		var err error
 		q, err = strconv.Atoi(s)
 		if err != nil {
-			return formatter.ErrNotANumber.Error()
+			return protocol.ErrNotANumber.Error()
 		}
 	}
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
-			result = formatter.Failure()
+			// result = protocol.ErrorMessage("Can`t find %v in memory", l)
+			result = protocol.Failure()
 			return
 		}
 
 		list, ok := parseList(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn`t list", l)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn`t list", l)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
 		if len(list) == 0 {
-			result = formatter.Array("[]")
+			result = protocol.Array("[]")
 			return
 		}
 
@@ -330,7 +330,7 @@ func EPOP(c *storage.Cache, l, s string) string {
 		cd.Value = serializeList(list[:start])
 		cd.Requests++
 
-		result = formatter.Array(serializeList(rm))
+		result = protocol.Array(serializeList(rm))
 	})
 
 	return result
@@ -341,32 +341,32 @@ func SRANGE(c *storage.Cache, l string, s []string) string {
 	var result string
 
 	if len(s) != 2 {
-		return formatter.ErrNotEnoughValues.Error()
+		return protocol.ErrNotEnoughValues.Error()
 	}
 
 	start, err := strconv.Atoi(s[0])
 	if err != nil {
-		return formatter.ErrNotANumber.Error()
+		return protocol.ErrNotANumber.Error()
 	}
 
 	end, err := strconv.Atoi(s[1])
 	if err != nil {
-		return formatter.ErrNotANumber.Error()
+		return protocol.ErrNotANumber.Error()
 	}
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
-			result = formatter.Array("[]")
+			// result = protocol.ErrorMessage("Can`t find %v in memory", l)
+			result = protocol.Array("[]")
 			return
 		}
 
 		v, ok := parseList(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn`t list", l)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn`t list", l)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
@@ -381,7 +381,7 @@ func SRANGE(c *storage.Cache, l string, s []string) string {
 		}
 
 		if start > end {
-			result = formatter.ErrInvalidRange.Error()
+			result = protocol.ErrInvalidRange.Error()
 			return
 		}
 
@@ -391,7 +391,7 @@ func SRANGE(c *storage.Cache, l string, s []string) string {
 			arr = append(arr, v[i])
 		}
 
-		result = formatter.Array(serializeList(arr))
+		result = protocol.Array(serializeList(arr))
 	})
 
 	return result
@@ -406,8 +406,8 @@ func CONTAINS(c *storage.Cache, l string, ks []string) string {
 
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			// result = formatter.ErrorMessage("can`t find %v in memory", l)
-			result = formatter.Number(0)
+			// result = protocol.ErrorMessage("can`t find %v in memory", l)
+			result = protocol.Number(0)
 			return
 		}
 
@@ -415,8 +415,8 @@ func CONTAINS(c *storage.Cache, l string, ks []string) string {
 
 		s, ok := parseList(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn`t list", l)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn`t list", l)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
@@ -429,7 +429,7 @@ func CONTAINS(c *storage.Cache, l string, ks []string) string {
 			q += m[k]
 		}
 
-		result = formatter.Number(q)
+		result = protocol.Number(q)
 	})
 
 	return result
@@ -444,8 +444,8 @@ func LCONTAINS(c *storage.Cache, l string, ks []string) string {
 
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			// result = formatter.ErrorMessage("can`t find %v in memory", l)
-			result = formatter.Array("[]")
+			// result = protocol.ErrorMessage("can`t find %v in memory", l)
+			result = protocol.Array("[]")
 			return
 		}
 
@@ -453,8 +453,8 @@ func LCONTAINS(c *storage.Cache, l string, ks []string) string {
 
 		s, ok := parseList(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn`t list", l)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn`t list", l)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
@@ -471,7 +471,7 @@ func LCONTAINS(c *storage.Cache, l string, ks []string) string {
 			}
 		}
 
-		result = formatter.Array(serializeList(arr))
+		result = protocol.Array(serializeList(arr))
 	})
 
 	return result
@@ -484,8 +484,8 @@ func INDEXOF(c *storage.Cache, l, k string) string {
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			// result = formatter.ErrorMessage("can`t find %v in memory", l)
-			result = formatter.Number(-1)
+			// result = protocol.ErrorMessage("can`t find %v in memory", l)
+			result = protocol.Number(-1)
 			return
 		}
 
@@ -493,8 +493,8 @@ func INDEXOF(c *storage.Cache, l, k string) string {
 
 		s, ok := parseList(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn`t list", l)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn`t list", l)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
@@ -507,7 +507,7 @@ func INDEXOF(c *storage.Cache, l, k string) string {
 			}
 		}
 
-		result = formatter.Number(i)
+		result = protocol.Number(i)
 	})
 
 	return result
@@ -521,17 +521,17 @@ func LLEN(c *storage.Cache, l string) string {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
-			result = formatter.Number(-1)
+			// result = protocol.ErrorMessage("Can`t find %v in memory", l)
+			result = protocol.Number(-1)
 			return
 		} else {
 			list, ok := parseList(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("%s isn`t list", l)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("%s isn`t list", l)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
-			result = formatter.Number(len(list))
+			result = protocol.Number(len(list))
 		}
 	})
 
@@ -546,21 +546,21 @@ func LCLEAR(c *storage.Cache, l string) string {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			// result = formatter.ErrorMessage("Can`t find %v in memory", l)
-			result = formatter.Failure()
+			// result = protocol.ErrorMessage("Can`t find %v in memory", l)
+			result = protocol.Failure()
 			return
 		} else {
 			_, ok := parseList(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("%s isn`t list", l)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("%s isn`t list", l)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 
 			cd.Value = serializeList([]string{})
 			cd.Requests++
 
-			result = formatter.Success()
+			result = protocol.Success()
 		}
 	})
 

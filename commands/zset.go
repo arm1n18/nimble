@@ -2,7 +2,7 @@ package commands
 
 import (
 	"encoding/json"
-	"nimble/formatter"
+	"nimble/protocol"
 	"nimble/storage"
 	"sort"
 	"strconv"
@@ -84,12 +84,12 @@ func ZADD(c *storage.Cache, z, v, s string) string {
 
 	score, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		// return formatter.ErrorMessage("Index must be a number: %s", s)
-		return formatter.ErrNotANumber.Error()
+		// return protocol.ErrorMessage("Index must be a number: %s", s)
+		return protocol.ErrNotANumber.Error()
 	}
 
 	if score < 0 {
-		return formatter.ErrInvalidScore.Error()
+		return protocol.ErrInvalidScore.Error()
 	}
 
 	c.WithLock(func() {
@@ -108,20 +108,20 @@ func ZADD(c *storage.Cache, z, v, s string) string {
 				Requests:  1,
 				CreatedAt: time.Now(),
 			})
-			result = formatter.Success()
+			result = protocol.Success()
 			return
 		}
 
 		cd.Requests++
 		zs, ok := parseZSet(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn't a zset", z)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn't a zset", z)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
 		if _, existsInSet := zs.Items[v]; existsInSet {
-			result = formatter.Failure()
+			result = protocol.Failure()
 		} else {
 			zs.Items[v] = score
 			zs.Order = addZOrder(zs.Order, ZItem{
@@ -130,7 +130,7 @@ func ZADD(c *storage.Cache, z, v, s string) string {
 			})
 			cd.Value = serializeZSet(*zs)
 
-			result = formatter.Success()
+			result = protocol.Success()
 		}
 	})
 
@@ -143,16 +143,16 @@ func ZREM(c *storage.Cache, z, v string) string {
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = formatter.ErrorMessage("Can`t find %v in memory", z)
-			result = formatter.Failure()
+			// result = protocol.ErrorMessage("Can`t find %v in memory", z)
+			result = protocol.Failure()
 			return
 		} else {
 			cd.Requests++
 
 			zs, ok := parseZSet(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("%s isn't a set", z)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("%s isn't a set", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 
@@ -161,9 +161,9 @@ func ZREM(c *storage.Cache, z, v string) string {
 
 				zs.Order = removeZOrder(zs.Order, v)
 				cd.Value = serializeZSet(*zs)
-				result = formatter.Success()
+				result = protocol.Success()
 			} else {
-				result = formatter.Failure()
+				result = protocol.Failure()
 			}
 
 		}
@@ -172,7 +172,7 @@ func ZREM(c *storage.Cache, z, v string) string {
 	return result
 }
 
-func ZRANGEBYSCORE(c *storage.Cache, z, s, e string) string {
+func ZRANGE(c *storage.Cache, z, s, e string) string {
 	var result string
 
 	if (s == "max" && e == "min") || (e == "max" && s == "min") {
@@ -181,8 +181,8 @@ func ZRANGEBYSCORE(c *storage.Cache, z, s, e string) string {
 
 			cd, exists := c.GetUnsafe(z)
 			if !exists {
-				// result = formatter.ErrorMessage("can`t find %v in memory", z)
-				result = formatter.Array("[]")
+				// result = protocol.ErrorMessage("can`t find %v in memory", z)
+				result = protocol.Array("[]")
 				return
 			}
 
@@ -190,8 +190,8 @@ func ZRANGEBYSCORE(c *storage.Cache, z, s, e string) string {
 
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				// result = formatter.ErrorMessage("%s isn't a zset", z)
-				result = formatter.ErrMismatchType.Error()
+				// result = protocol.ErrorMessage("%s isn't a zset", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 
@@ -205,10 +205,10 @@ func ZRANGEBYSCORE(c *storage.Cache, z, s, e string) string {
 				}
 			}
 
-			result = formatter.Array(serializeZItems(arr...))
+			result = protocol.Array(serializeZItems(arr...))
 		})
 	} else {
-		return formatter.ErrInvalidSyntax.Error()
+		return protocol.ErrInvalidSyntax.Error()
 	}
 
 	return result
@@ -220,20 +220,20 @@ func SCORE(c *storage.Cache, z, k string) string {
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// formatter.ErrorMessage("Can`t find %v in memory", z)
-			result = formatter.Number(-1)
+			// protocol.ErrorMessage("Can`t find %v in memory", z)
+			result = protocol.Number(-1)
 			return
 		} else {
 			cd.Requests++
 			if zs, ok := parseZSet(cd.Value); ok {
 				if s, ok := zs.Items[k]; ok {
-					result = formatter.Number(s)
+					result = protocol.Number(s)
 				} else {
-					result = formatter.Number(-1)
+					result = protocol.Number(-1)
 				}
 			} else {
-				// formatter.ErrorMessage("%s isn't a zset", z)
-				result = formatter.ErrMismatchType.Error()
+				// protocol.ErrorMessage("%s isn't a zset", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 		}
@@ -242,21 +242,21 @@ func SCORE(c *storage.Cache, z, k string) string {
 	return result
 }
 
-func LSCORE(c *storage.Cache, z string, ks []string) string {
+func LSCORE(c *storage.Cache, z string, args ...string) string {
 	var result string
 
 	c.WithRWLock(func() {
-		arr := make([]string, 0, len(ks))
+		arr := make([]string, 0, len(args))
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = formatter.ErrorMessage("Can`t find %v in memory", z)
-			result = formatter.Array("[]")
+			// result = protocol.ErrorMessage("Can`t find %v in memory", z)
+			result = protocol.Array("[]")
 			return
 		} else {
 			cd.Requests++
 			if zs, ok := parseZSet(cd.Value); ok {
-				for _, k := range ks {
+				for _, k := range args {
 					if s, ok := zs.Items[k]; ok {
 						arr = append(arr, serializeFloat(s))
 					} else {
@@ -264,13 +264,13 @@ func LSCORE(c *storage.Cache, z string, ks []string) string {
 					}
 				}
 			} else {
-				// formatter.ErrorMessage("%s isn't a zset", z)
-				result = formatter.ErrMismatchType.Error()
+				// protocol.ErrorMessage("%s isn't a zset", z)
+				result = protocol.ErrMismatchType.Error()
 				return
 			}
 		}
 
-		result = formatter.Array(serializeList(arr))
+		result = protocol.Array(serializeList(arr))
 	})
 
 	return result

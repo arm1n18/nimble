@@ -5,16 +5,6 @@ import (
 	"time"
 )
 
-// Defined memory usage limit
-var MAX_MEMO int
-
-type Mode string
-
-const (
-	ReadOnly  Mode = "read-only"
-	ReadWrite Mode = "read-write"
-)
-
 type CacheDataType string
 
 const (
@@ -31,7 +21,6 @@ type CacheDataUpdate struct {
 	Type      *CacheDataType
 	CreatedAt *time.Time
 	ExpiresAt *time.Time
-	// TTL       *time.Time
 }
 
 type CacheData struct {
@@ -40,19 +29,16 @@ type CacheData struct {
 	Type      CacheDataType
 	CreatedAt time.Time
 	ExpiresAt *time.Time
-	// TTL       *time.Time
 }
 
 type Cache struct {
 	data map[string]*CacheData
-	mode Mode
 	mu   sync.RWMutex
 }
 
 func CreateCache() *Cache {
 	return &Cache{
 		data: make(map[string]*CacheData),
-		mode: ReadWrite,
 	}
 }
 
@@ -61,7 +47,6 @@ func (c *Cache) ResetCache() {
 	defer c.mu.Unlock()
 
 	c.data = make(map[string]*CacheData)
-	c.mode = ReadWrite
 }
 
 func (c *Cache) WithLock(fn func()) {
@@ -93,19 +78,11 @@ func (c *Cache) GetSafe(k string) (*CacheData, bool) {
 	return c.GetUnsafe(k)
 }
 
-func (c *Cache) GetData() map[string]*CacheData {
-	return c.data
-}
-
-func (c *Cache) GetMode() Mode {
-	return c.mode
-}
-
 func (c *Cache) SetUnsafe(k string, v *CacheData) {
 	c.data[k] = v
 }
 
-func (c *Cache) SetPartialUnsafe(k string, nD CacheDataUpdate) {
+func (c *Cache) SetPartialUnsafe(k string, d CacheDataUpdate) {
 	cd, exists := c.GetUnsafe(k)
 	if !exists {
 		return
@@ -116,28 +93,28 @@ func (c *Cache) SetPartialUnsafe(k string, nD CacheDataUpdate) {
 		c.data[k] = cd
 	}
 
-	if nD.Value != nil {
-		cd.Value = *nD.Value
+	if d.Value != nil {
+		cd.Value = *d.Value
 	}
-	if nD.Requests != nil {
-		cd.Requests = *nD.Requests
+	if d.Requests != nil {
+		cd.Requests = *d.Requests
 	}
-	if nD.CreatedAt != nil {
-		cd.CreatedAt = *nD.CreatedAt
+	if d.CreatedAt != nil {
+		cd.CreatedAt = *d.CreatedAt
 	}
 
-	cd.ExpiresAt = nD.ExpiresAt
+	cd.ExpiresAt = d.ExpiresAt
 
-	if nD.Type != nil {
-		cd.Type = *nD.Type
+	if d.Type != nil {
+		cd.Type = *d.Type
 	}
 }
 
-func (c *Cache) SetMode(m Mode) {
-	c.mode = m
+func (c *Cache) GetUnsafeData() map[string]*CacheData {
+	return c.data
 }
 
-func (c *Cache) StartBgCleanup(interval time.Duration) {
+func (c *Cache) BGGC(interval time.Duration) {
 	func() {
 		t := time.NewTicker(interval)
 		defer t.Stop()

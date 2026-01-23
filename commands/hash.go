@@ -2,7 +2,7 @@ package commands
 
 import (
 	"encoding/json"
-	"nimble/formatter"
+	"nimble/protocol"
 	"nimble/storage"
 	"time"
 )
@@ -51,7 +51,7 @@ func HSET(c *storage.Cache, h string, args ...string) string {
 						Requests: cd.Requests + 1,
 					})
 
-					result = formatter.Ok()
+					result = protocol.Ok()
 					return
 				}
 			}
@@ -67,10 +67,10 @@ func HSET(c *storage.Cache, h string, args ...string) string {
 				CreatedAt: time.Now(),
 			})
 
-			result = formatter.Ok()
+			result = protocol.Ok()
 		})
 	} else {
-		return formatter.ErrNotEnoughValues.Error()
+		return protocol.ErrNotEnoughValues.Error()
 	}
 
 	return result
@@ -86,7 +86,7 @@ func HGET(c *storage.Cache, h string, ks ...string) string {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
 			// todocmd
-			result = formatter.Array("[]")
+			result = protocol.Array("[]")
 			return
 		}
 
@@ -94,8 +94,8 @@ func HGET(c *storage.Cache, h string, ks ...string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn't a hash", h)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn't a hash", h)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
@@ -103,11 +103,11 @@ func HGET(c *storage.Cache, h string, ks ...string) string {
 			if v, exists := m[k]; exists {
 				arr[i] = v
 			} else {
-				arr[i] = formatter.Nil()
+				arr[i] = protocol.Nil()
 			}
 		}
 
-		result = formatter.Array(serializeList(arr))
+		result = protocol.Array(serializeList(arr))
 	})
 
 	return result
@@ -120,7 +120,7 @@ func HKEYS(c *storage.Cache, h string) string {
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = formatter.Array("[]")
+			result = protocol.Array("[]")
 			return
 		}
 
@@ -128,8 +128,8 @@ func HKEYS(c *storage.Cache, h string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn't a hash", h)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn't a hash", h)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
@@ -138,7 +138,7 @@ func HKEYS(c *storage.Cache, h string) string {
 			s = append(s, k)
 		}
 
-		result = formatter.Array(serializeList(s))
+		result = protocol.Array(serializeList(s))
 	})
 
 	return result
@@ -151,8 +151,8 @@ func HVALUES(c *storage.Cache, h string) string {
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			// result = formatter.ErrorMessage("can`t find %v in memory", h)
-			result = formatter.Array("[]")
+			// result = protocol.ErrorMessage("can`t find %v in memory", h)
+			result = protocol.Array("[]")
 			return
 		}
 
@@ -160,8 +160,8 @@ func HVALUES(c *storage.Cache, h string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn't a hash", h)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn't a hash", h)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
@@ -170,7 +170,7 @@ func HVALUES(c *storage.Cache, h string) string {
 			s = append(s, v)
 		}
 
-		result = formatter.Array(serializeList(s))
+		result = protocol.Array(serializeList(s))
 	})
 
 	return result
@@ -181,7 +181,7 @@ func HDEL(c *storage.Cache, h string, args ...string) string {
 	var result string
 
 	if len(args) == 0 {
-		return formatter.ErrNotEnoughValues.Error()
+		return protocol.ErrNotEnoughValues.Error()
 	}
 
 	c.WithLock(func() {
@@ -189,8 +189,8 @@ func HDEL(c *storage.Cache, h string, args ...string) string {
 
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			// result = formatter.ErrorMessage("can`t find %v in memory", h)
-			result = formatter.Number(-1)
+			// result = protocol.ErrorMessage("can`t find %v in memory", h)
+			result = protocol.Number(-1)
 			return
 		}
 
@@ -198,8 +198,8 @@ func HDEL(c *storage.Cache, h string, args ...string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn't a hash", h)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn't a hash", h)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
@@ -215,7 +215,7 @@ func HDEL(c *storage.Cache, h string, args ...string) string {
 			Requests: cd.Requests + 1,
 		})
 
-		result = formatter.Number(q)
+		result = protocol.Number(q)
 	})
 
 	return result
@@ -230,8 +230,8 @@ func HCONTAINS(c *storage.Cache, h string, args ...string) string {
 
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = formatter.ErrorMessage("can`t find %v in memory", h)
-			result = formatter.Number(-1)
+			result = protocol.ErrorMessage("can`t find %v in memory", h)
+			result = protocol.Number(-1)
 			return
 		}
 
@@ -239,8 +239,8 @@ func HCONTAINS(c *storage.Cache, h string, args ...string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn't a hash", h)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn't a hash", h)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
@@ -250,7 +250,7 @@ func HCONTAINS(c *storage.Cache, h string, args ...string) string {
 			}
 		}
 
-		result = formatter.Number(q)
+		result = protocol.Number(q)
 	})
 
 	return result
@@ -265,7 +265,7 @@ func LHCONTAINS(c *storage.Cache, h string, args ...string) string {
 
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = formatter.Array("[]")
+			result = protocol.Array("[]")
 			return
 		}
 
@@ -273,8 +273,8 @@ func LHCONTAINS(c *storage.Cache, h string, args ...string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn't a hash", h)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn't a hash", h)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
@@ -286,7 +286,7 @@ func LHCONTAINS(c *storage.Cache, h string, args ...string) string {
 			}
 		}
 
-		result = formatter.Array(serializeList(arr))
+		result = protocol.Array(serializeList(arr))
 	})
 
 	return result
@@ -299,7 +299,7 @@ func HLEN(c *storage.Cache, h string) string {
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = formatter.Number(-1)
+			result = protocol.Number(-1)
 			return
 		}
 
@@ -307,12 +307,12 @@ func HLEN(c *storage.Cache, h string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = formatter.ErrorMessage("%s isn't a hash", h)
-			result = formatter.ErrMismatchType.Error()
+			// result = protocol.ErrorMessage("%s isn't a hash", h)
+			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
-		result = formatter.Number(len(m))
+		result = protocol.Number(len(m))
 	})
 
 	return result

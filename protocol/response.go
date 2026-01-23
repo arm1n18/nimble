@@ -1,4 +1,4 @@
-package formatter
+package protocol
 
 import (
 	"fmt"
@@ -23,7 +23,11 @@ func FatalError(format string, a ...any) {
 	os.Exit(1)
 }
 
-func SuccessMessage(a ...any) string {
+func Ok() string {
+	return "+OK"
+}
+
+func OkMessage(a ...any) string {
 	return fmt.Sprintf("+OK %v", a...)
 }
 
@@ -31,20 +35,15 @@ func Success() string {
 	return ":1"
 }
 
-func Ok() string {
-	return "+OK"
-}
-
 func Failure() string {
 	return ":0"
 }
 
-func ErrorMessage(format string, a ...any) string {
+func ErrorMessage(a ...any) string {
 	return fmt.Sprintf("-ERR %v", a...)
 }
 
 func String(a string) string {
-	// todo
 	return fmt.Sprintf("$%s", a)
 }
 

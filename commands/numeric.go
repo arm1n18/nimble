@@ -2,7 +2,7 @@ package commands
 
 import (
 	"fmt"
-	"nimble/formatter"
+	"nimble/protocol"
 	"nimble/storage"
 	"strconv"
 	"time"
@@ -34,13 +34,13 @@ func INCR(c *storage.Cache, k string) string {
 				Type:      storage.String,
 				CreatedAt: time.Now(),
 			})
-			result = formatter.Number(1)
+			result = protocol.Number(1)
 			return
 		}
 
 		cv, ok := parseFloat(cd.Value)
 		if !ok {
-			result = formatter.ErrNotANumber.Error()
+			result = protocol.ErrNotANumber.Error()
 			return
 		}
 
@@ -48,7 +48,7 @@ func INCR(c *storage.Cache, k string) string {
 		cd.Value = serializeFloat(calc)
 		cd.Requests++
 
-		result = formatter.Number(calc)
+		result = protocol.Number(calc)
 	})
 
 	return result
@@ -67,13 +67,13 @@ func DECR(c *storage.Cache, k string) string {
 				Type:      storage.String,
 				CreatedAt: time.Now(),
 			})
-			result = formatter.Number(-1)
+			result = protocol.Number(-1)
 			return
 		}
 
 		cv, ok := parseFloat(cd.Value)
 		if !ok {
-			result = formatter.ErrNotANumber.Error()
+			result = protocol.ErrNotANumber.Error()
 			return
 		}
 
@@ -81,7 +81,7 @@ func DECR(c *storage.Cache, k string) string {
 		cd.Value = serializeFloat(calc)
 		cd.Requests++
 
-		result = formatter.Number(calc)
+		result = protocol.Number(calc)
 	})
 
 	return result
@@ -93,7 +93,7 @@ func INCRBY(c *storage.Cache, k, v string) string {
 
 	f, ok := parseFloat(v)
 	if !ok {
-		return formatter.ErrMismatchType.Error()
+		return protocol.ErrMismatchType.Error()
 	}
 
 	c.WithLock(func() {
@@ -105,13 +105,13 @@ func INCRBY(c *storage.Cache, k, v string) string {
 				Type:      storage.String,
 				CreatedAt: time.Now(),
 			})
-			result = formatter.Number(f)
+			result = protocol.Number(f)
 			return
 		}
 
 		cv, ok := parseFloat(cd.Value)
 		if !ok {
-			result = formatter.ErrNotANumber.Error()
+			result = protocol.ErrNotANumber.Error()
 			return
 		}
 
@@ -119,7 +119,7 @@ func INCRBY(c *storage.Cache, k, v string) string {
 		cd.Value = serializeFloat(calc)
 		cd.Requests++
 
-		result = formatter.Number(calc)
+		result = protocol.Number(calc)
 	})
 
 	return result
@@ -131,7 +131,7 @@ func DECRBY(c *storage.Cache, k, v string) string {
 
 	f, ok := parseFloat(v)
 	if !ok {
-		return formatter.ErrMismatchType.Error()
+		return protocol.ErrMismatchType.Error()
 	}
 
 	c.WithLock(func() {
@@ -143,13 +143,13 @@ func DECRBY(c *storage.Cache, k, v string) string {
 				Type:      storage.String,
 				CreatedAt: time.Now(),
 			})
-			result = formatter.Number(f * -1)
+			result = protocol.Number(f * -1)
 			return
 		}
 
 		cv, ok := parseFloat(cd.Value)
 		if !ok {
-			result = formatter.ErrNotANumber.Error()
+			result = protocol.ErrNotANumber.Error()
 			return
 		}
 
@@ -157,19 +157,19 @@ func DECRBY(c *storage.Cache, k, v string) string {
 		cd.Value = serializeFloat(calc)
 		cd.Requests++
 
-		result = formatter.Number(calc)
+		result = protocol.Number(calc)
 	})
 
 	return result
 }
 
 // Multiply the number by n
-func MULL(c *storage.Cache, k, v string) string {
+func MUL(c *storage.Cache, k, v string) string {
 	var result string
 
 	f, ok := parseFloat(v)
 	if !ok {
-		return formatter.ErrMismatchType.Error()
+		return protocol.ErrMismatchType.Error()
 	}
 
 	c.WithLock(func() {
@@ -181,13 +181,13 @@ func MULL(c *storage.Cache, k, v string) string {
 				Type:      storage.String,
 				CreatedAt: time.Now(),
 			})
-			result = formatter.Number(0)
+			result = protocol.Number(0)
 			return
 		}
 
 		cv, ok := parseFloat(cd.Value)
 		if !ok {
-			result = formatter.ErrNotANumber.Error()
+			result = protocol.ErrNotANumber.Error()
 			return
 		}
 
@@ -195,7 +195,7 @@ func MULL(c *storage.Cache, k, v string) string {
 		cd.Value = serializeFloat(calc)
 		cd.Requests++
 
-		result = formatter.Number(calc)
+		result = protocol.Number(calc)
 	})
 
 	return result
@@ -207,7 +207,7 @@ func DIV(c *storage.Cache, k, v string) string {
 
 	f, ok := parseFloat(v)
 	if !ok {
-		return formatter.ErrMismatchType.Error()
+		return protocol.ErrMismatchType.Error()
 	}
 
 	c.WithLock(func() {
@@ -219,13 +219,13 @@ func DIV(c *storage.Cache, k, v string) string {
 				Type:      storage.String,
 				CreatedAt: time.Now(),
 			})
-			result = formatter.Number(0)
+			result = protocol.Number(0)
 			return
 		}
 
 		cv, ok := parseFloat(cd.Value)
 		if !ok {
-			result = formatter.ErrNotANumber.Error()
+			result = protocol.ErrNotANumber.Error()
 			return
 		}
 
@@ -233,7 +233,7 @@ func DIV(c *storage.Cache, k, v string) string {
 		cd.Value = serializeFloat(calc)
 		cd.Requests++
 
-		result = formatter.Number(calc)
+		result = protocol.Number(calc)
 	})
 
 	return result
