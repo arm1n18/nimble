@@ -24,6 +24,19 @@ func serializeSet(s map[string]struct{}) string {
 	return string(b)
 }
 
+/*
+Add one or more members to a set.
+
+Description:
+
+	Adds the specified values to the set. Duplicate values are ignored.
+
+Example:
+  - Pattern: SADD SET_NAME "VALUE_1" "VALUE_2"
+
+Notes:
+  - Returns the number of values that were actually added to the set.
+*/
 func SADD(c *storage.Cache, z string, args ...string) string {
 	var result string
 
@@ -64,7 +77,6 @@ func SADD(c *storage.Cache, z string, args ...string) string {
 				cd.Value = serializeSet(m)
 				result = protocol.Number(q)
 			} else {
-				// result = protocol.ErrorMessage("%s isn't a set", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -74,6 +86,19 @@ func SADD(c *storage.Cache, z string, args ...string) string {
 	return result
 }
 
+/*
+Remove one or more members from a set.
+
+Description:
+
+	Removes the specified values from the set.
+
+Example:
+  - Pattern: SREM SET_NAME "VALUE_1" "VALUE_2"
+
+Notes:
+  - Returns the number of values that were actually removes from the set.
+*/
 func SREM(c *storage.Cache, z string, args ...string) string {
 	var result string
 
@@ -86,7 +111,6 @@ func SREM(c *storage.Cache, z string, args ...string) string {
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = protocol.ErrorMessage("Can`t find %v in memory", z)
 			result = protocol.Failure()
 			return
 		} else {
@@ -102,7 +126,6 @@ func SREM(c *storage.Cache, z string, args ...string) string {
 				cd.Value = serializeSet(m)
 				result = protocol.Number(q)
 			} else {
-				// result = protocol.ErrorMessage("%s isn't a set", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -112,6 +135,19 @@ func SREM(c *storage.Cache, z string, args ...string) string {
 	return result
 }
 
+/*
+Check if a values exists in a set.
+
+Description:
+
+	Checks if the specified value is a member of the set.
+
+Example:
+  - Pattern: SCONTAINS SET_NAME "VALUE_1" "VALUE_2"
+
+Notes:
+  - Returns the number of specified values that exist in the set.
+*/
 func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 	var result string
 
@@ -119,7 +155,6 @@ func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 		var q int
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = protocol.ErrorMessage("can`t find %v in memory", z)
 			result = protocol.Number(-1)
 			return
 		}
@@ -130,7 +165,6 @@ func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("can't parse set: %s", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -144,7 +178,6 @@ func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("can't parse zset: %s", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -156,7 +189,6 @@ func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 
 			result = protocol.Number(q)
 		default:
-			// result = protocol.ErrorMessage("%s isn't a set", z)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -165,6 +197,22 @@ func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 	return result
 }
 
+/*
+Check if values exist in a set.
+
+Description:
+
+	Checks if the specified values exist in the set.
+
+Example:
+
+  - Pattern: LSCONTAINS SET_NAME "VALUE_1" "VALUE_2"
+
+  - Result: [1, 0]
+
+Notes:
+  - Returns an array of 1s and 0s, where 1 indicates the value exists and 0 indicates it does not.
+*/
 func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 	var result string
 
@@ -173,7 +221,6 @@ func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = protocol.ErrorMessage("can`t find %v in memory", z)
 			result = protocol.Array("[]")
 			return
 		}
@@ -184,7 +231,6 @@ func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("can't parse set: %s", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -200,7 +246,6 @@ func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("can't parse zset: %s", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -214,7 +259,6 @@ func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 
 			result = protocol.Array(serializeList(arr))
 		default:
-			// result = protocol.ErrorMessage("%s isn't a set", z)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -223,13 +267,28 @@ func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 	return result
 }
 
+/*
+Get the number of stored values in set.
+
+Description:
+
+	Returns a number of all stored values in set.
+
+Example:
+
+  - Pattern: SLEN SET_NAME
+
+  - Result: 2
+
+Notes:
+  - Returns the number of all values that exist in the set.
+*/
 func SLEN(c *storage.Cache, z string) string {
 	var result string
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = protocol.ErrorMessage("can`t find %v in memory", z)
 			result = protocol.Number(-1)
 			return
 		}
@@ -240,7 +299,6 @@ func SLEN(c *storage.Cache, z string) string {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("can't parse set: %s", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -248,13 +306,11 @@ func SLEN(c *storage.Cache, z string) string {
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("can't parse zset: %s", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
 			result = protocol.Number(len(m.Items))
 		default:
-			// result = protocol.ErrorMessage("%s isn't a set", z)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -263,6 +319,19 @@ func SLEN(c *storage.Cache, z string) string {
 	return result
 }
 
+/*
+Get all members from a set.
+
+Description:
+
+	Returns a list of all values stored in the set.
+
+Example:
+  - Pattern: SMEMBERS SET_NAME
+
+Notes:
+  - Returns an array of all values that stored in the set.
+*/
 func SMEMBERS(c *storage.Cache, z string) string {
 	var result string
 
@@ -271,7 +340,6 @@ func SMEMBERS(c *storage.Cache, z string) string {
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = protocol.ErrorMessage("can`t find %v in memory", z)
 			result = protocol.Array("[]")
 			return
 		}
@@ -282,7 +350,6 @@ func SMEMBERS(c *storage.Cache, z string) string {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("can't parse set: %s", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -294,7 +361,6 @@ func SMEMBERS(c *storage.Cache, z string) string {
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("can't parse zset: %s", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -305,7 +371,6 @@ func SMEMBERS(c *storage.Cache, z string) string {
 
 			result = protocol.Array(serializeList(arr))
 		default:
-			// result = protocol.ErrorMessage("%s isn't a set", z)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}

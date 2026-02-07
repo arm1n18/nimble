@@ -59,7 +59,6 @@ func CreateConfig() *Config {
 			name:     "nimble",
 			password: "default",
 		})
-		log.Println("no users provided, using default credentials")
 	}
 
 	return &c
@@ -108,6 +107,16 @@ func (c *Config) SetMode(mode string) (string, bool) {
 
 func (c *Config) GetMode() Mode {
 	return c.mode
+}
+
+func (c *Config) GetUsers() []string {
+	s := make([]string, 0, len(c.users))
+
+	for _, v := range c.users {
+		s = append(s, v.name)
+	}
+
+	return s
 }
 
 func (c *Config) ReadOnlyMiddleware(fn func() string) string {

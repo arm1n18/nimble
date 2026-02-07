@@ -22,7 +22,20 @@ func serializeList(l []string) string {
 	return string(b)
 }
 
-// Create empty list
+/*
+Create empty list.
+
+Description:
+
+	Creates a new, empty list.
+
+Example:
+  - Pattern: ESET LIST_NAME
+
+Notes:
+  - If the key already exists, it will be overwritten.
+  - Returns OK on success.
+*/
 func ESET(c *storage.Cache, l string) string {
 	var result string
 
@@ -42,7 +55,19 @@ func ESET(c *storage.Cache, l string) string {
 	return result
 }
 
-// Set value at index in the list
+/*
+Set value at a specific index in a list.
+
+Description:
+
+	Sets the value of the element at the specified index in the list.
+
+Example:
+  - Pattern: LSET LIST_NAME INDEX "VALUE"
+
+Notes:
+  - Returns the number of values that were set.
+*/
 func LSET(c *storage.Cache, l string, s ...string) string {
 	var result string
 
@@ -62,7 +87,6 @@ func LSET(c *storage.Cache, l string, s ...string) string {
 			var ok bool
 			arr, ok = parseList(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("%s isn`t list", l)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -71,13 +95,10 @@ func LSET(c *storage.Cache, l string, s ...string) string {
 		for i := 0; i < len(s); i += 2 {
 			index, err := strconv.Atoi(s[i])
 			if err != nil {
-				// result = protocol.ErrorMessage("Index must be a number: %s", s[i])
-				// result = protocol.ErrNotANumber.Error()
 				continue
 			}
 
 			if index < 0 {
-				// result = protocol.ErrorMessage("Index out of range: %v", index)
 				result = protocol.ErrInvalidRange.Error()
 				continue
 			}
@@ -110,7 +131,19 @@ func LSET(c *storage.Cache, l string, s ...string) string {
 	return result
 }
 
-// Get value at index in the list
+/*
+Get value at a specific index in a list.
+
+Description:
+
+	Returns the value of the element at the specified index in the list.
+
+Example:
+  - Pattern: LGET LIST_NAME INDEX
+
+Notes:
+  - Returns an array of values with specified index.
+*/
 func LGET(c *storage.Cache, l string, s ...string) string {
 	var result string
 
@@ -121,13 +154,11 @@ func LGET(c *storage.Cache, l string, s ...string) string {
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			// result = protocol.ErrorMessage("Can`t find %v in memory", l)
 			result = protocol.Array("[]")
 			return
 		} else {
 			list, ok := parseList(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("%s isn`t list", l)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -136,8 +167,6 @@ func LGET(c *storage.Cache, l string, s ...string) string {
 			for _, v := range s {
 				index, err := strconv.Atoi(v)
 				if err != nil {
-					// result = protocol.ErrorMessage("Index must be a number: %s", s[i])
-					// result = protocol.ErrNotANumber.Error()
 					return
 				}
 
@@ -156,17 +185,25 @@ func LGET(c *storage.Cache, l string, s ...string) string {
 	return result
 }
 
-// Push to the start of the list
+/*
+Push a value to the start of a list.
+
+Description:
+
+	Inserts the value at the beginning of the list.
+
+Example:
+  - Pattern: SPUSH LIST_NAME "VALUE"
+
+Notes:
+  - Returns the new length of the list after the push.
+*/
 func SPUSH(c *storage.Cache, l string, s ...string) string {
 	var result string
 
 	if len(s) == 0 {
 		return protocol.ErrNotEnoughValues.Error()
 	}
-
-	// if ok := removeQuotes(&s, 0, 1); !ok {
-	// 	return
-	// }
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
@@ -180,10 +217,11 @@ func SPUSH(c *storage.Cache, l string, s ...string) string {
 				Requests:  1,
 				CreatedAt: time.Now(),
 			})
+
+			result = protocol.Number(len(value))
 		} else {
 			arr, ok := parseList(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("%s isn`t list", l)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -191,15 +229,28 @@ func SPUSH(c *storage.Cache, l string, s ...string) string {
 			arr = append(s, arr...)
 			cd.Value = serializeList(arr)
 			cd.Requests++
+
+			result = protocol.Number(len(arr))
 		}
 
-		result = protocol.Number(len(s))
 	})
 
 	return result
 }
 
-// Push to the end of the list
+/*
+Push a value to the end of a list.
+
+Description:
+
+	Inserts the value at the end of the list.
+
+Example:
+  - Pattern: EPUSH LIST_NAME "VALUE"
+
+Notes:
+  - Returns the new length of the list after the push.
+*/
 func EPUSH(c *storage.Cache, l string, s ...string) string {
 	var result string
 
@@ -219,10 +270,11 @@ func EPUSH(c *storage.Cache, l string, s ...string) string {
 				Requests:  1,
 				CreatedAt: time.Now(),
 			})
+
+			result = protocol.Number(len(s))
 		} else {
 			arr, ok := parseList(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("%s isn`t list", l)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -230,15 +282,26 @@ func EPUSH(c *storage.Cache, l string, s ...string) string {
 			arr = append(arr, s...)
 			cd.Value = serializeList(arr)
 			cd.Requests++
-		}
 
-		result = protocol.Number(len(s))
+			result = protocol.Number(len(arr))
+		}
 	})
 
 	return result
 }
 
-// Remove from the start of the list
+/*
+Pop a value from the start of a list.
+
+Description:
+Removes first N elements from the start of the list.
+
+Example:
+  - Pattern: SPOP LIST_NAME N
+
+Notes:
+  - Returns an array of popped values.
+*/
 func SPOP(c *storage.Cache, l, s string) string {
 	var result string
 
@@ -255,14 +318,12 @@ func SPOP(c *storage.Cache, l, s string) string {
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			// result = protocol.ErrorMessage("Can`t find %v in memory", l)
 			result = protocol.Failure()
 			return
 		}
 
 		list, ok := parseList(cd.Value)
 		if !ok {
-			// protocol.ErrorMessage("%s isn`t list", l)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -286,7 +347,19 @@ func SPOP(c *storage.Cache, l, s string) string {
 	return result
 }
 
-// Remove from the end of the list
+/*
+Pop a value from the end of a list.
+
+Description:
+
+	Removes first N elements from the end of the list.
+
+Example:
+  - Pattern: EPOP LIST_NAME N
+
+Notes:
+  - Returns an array of popped values.
+*/
 func EPOP(c *storage.Cache, l, s string) string {
 	var result string
 
@@ -303,14 +376,12 @@ func EPOP(c *storage.Cache, l, s string) string {
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			// result = protocol.ErrorMessage("Can`t find %v in memory", l)
 			result = protocol.Failure()
 			return
 		}
 
 		list, ok := parseList(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn`t list", l)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -336,7 +407,19 @@ func EPOP(c *storage.Cache, l, s string) string {
 	return result
 }
 
-// Get list of l list in a given range
+/*
+Get a range of elements from a list.
+
+Description:
+
+	Retrieves elements from the list between the specified start and end indexes.
+
+Example:
+  - Pattern: SRANGE LIST_NAME 0 4
+
+Notes:
+  - Returns an array of elements within the specified range.
+*/
 func SRANGE(c *storage.Cache, l string, s []string) string {
 	var result string
 
@@ -358,14 +441,12 @@ func SRANGE(c *storage.Cache, l string, s []string) string {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			// result = protocol.ErrorMessage("Can`t find %v in memory", l)
 			result = protocol.Array("[]")
 			return
 		}
 
 		v, ok := parseList(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn`t list", l)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -397,7 +478,19 @@ func SRANGE(c *storage.Cache, l string, s []string) string {
 	return result
 }
 
-// Check if the values exist in the list and return their quantity
+/*
+Check if values exist in a list.
+
+Description:
+
+	Checks if the specified values exist in the list.
+
+Example:
+  - Pattern: CONTAINS LIST_NAME "VALUE_1" "VALUE_2"
+
+Notes:
+  - Returns the number of specified values that exist in the list.
+*/
 func CONTAINS(c *storage.Cache, l string, ks []string) string {
 	var result string
 
@@ -406,7 +499,6 @@ func CONTAINS(c *storage.Cache, l string, ks []string) string {
 
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			// result = protocol.ErrorMessage("can`t find %v in memory", l)
 			result = protocol.Number(0)
 			return
 		}
@@ -415,7 +507,6 @@ func CONTAINS(c *storage.Cache, l string, ks []string) string {
 
 		s, ok := parseList(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn`t list", l)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -435,7 +526,22 @@ func CONTAINS(c *storage.Cache, l string, ks []string) string {
 	return result
 }
 
-// Check if the values exist in the list and return list
+/*
+Check if values exist in a list.
+
+Description:
+
+	Checks if the specified values exist in the list.
+
+Example:
+
+  - Pattern: LCONTAINS LIST_NAME "VALUE_1" "VALUE_2"
+
+  - Result: [1, 0]
+
+Notes:
+  - Returns an array of 1s and 0s, where 1 indicates the value exists and 0 indicates it does not.
+*/
 func LCONTAINS(c *storage.Cache, l string, ks []string) string {
 	var result string
 
@@ -444,7 +550,6 @@ func LCONTAINS(c *storage.Cache, l string, ks []string) string {
 
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			// result = protocol.ErrorMessage("can`t find %v in memory", l)
 			result = protocol.Array("[]")
 			return
 		}
@@ -453,7 +558,6 @@ func LCONTAINS(c *storage.Cache, l string, ks []string) string {
 
 		s, ok := parseList(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn`t list", l)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -477,14 +581,26 @@ func LCONTAINS(c *storage.Cache, l string, ks []string) string {
 	return result
 }
 
-// Return index of target value in list
+/*
+Get the index of a value in a list.
+
+Description:
+
+	Returns the first index of the value in the list.
+
+Example:
+  - Pattern: INDEXOF LIST_NAME "VALUE"
+
+Notes:
+  - Returns the index as an integer.
+  - Returns -1 if the value is not found in the list.
+*/
 func INDEXOF(c *storage.Cache, l, k string) string {
 	var result string
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			// result = protocol.ErrorMessage("can`t find %v in memory", l)
 			result = protocol.Number(-1)
 			return
 		}
@@ -493,7 +609,6 @@ func INDEXOF(c *storage.Cache, l, k string) string {
 
 		s, ok := parseList(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn`t list", l)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -513,7 +628,23 @@ func INDEXOF(c *storage.Cache, l, k string) string {
 	return result
 }
 
-// Get length of the list
+/*
+Get the number of stored values in list.
+
+Description:
+
+	Returns a number of all stored values in list.
+
+Example:
+
+  - Pattern: HLEN LIST_NAME
+
+  - Result: 2
+
+Notes:
+
+  - Returns the number of all values that exist in the list.
+*/
 func LLEN(c *storage.Cache, l string) string {
 	var result string
 
@@ -521,13 +652,11 @@ func LLEN(c *storage.Cache, l string) string {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			// result = protocol.ErrorMessage("Can`t find %v in memory", l)
 			result = protocol.Number(-1)
 			return
 		} else {
 			list, ok := parseList(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("%s isn`t list", l)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -538,7 +667,18 @@ func LLEN(c *storage.Cache, l string) string {
 	return result
 }
 
-// Clear the list
+/*
+Clear a list.
+
+Description:
+Removes all elements from the list.
+
+Example:
+  - Pattern: LCLEAR LIST_NAME
+
+Notes:
+  - Returns 1 on success.
+*/
 func LCLEAR(c *storage.Cache, l string) string {
 	var result string
 
@@ -546,13 +686,11 @@ func LCLEAR(c *storage.Cache, l string) string {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			// result = protocol.ErrorMessage("Can`t find %v in memory", l)
 			result = protocol.Failure()
 			return
 		} else {
 			_, ok := parseList(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("%s isn`t list", l)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}

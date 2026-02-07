@@ -11,8 +11,8 @@ import (
 Set key expiration (Time to Kill)
 
 Description:
-Sets a lifespan for the specified key. The key will be automatically deleted from the cache
-after the given number of seconds.
+
+	Sets a lifespan for the specified key. The key will be automatically deleted from the cache after the given number of seconds.
 
 Example:
 
@@ -70,7 +70,8 @@ func TTK(c *storage.Cache, k, v string) string {
 Time left before data is deleted (Time to Live)
 
 Description:
-Returns the remaining time (in seconds) before the specified key is automatically deleted from the cache.
+
+	Returns the remaining time (in seconds) before the specified key is automatically deleted from the cache.
 
 Example:
 
@@ -94,7 +95,6 @@ func TTL(c *storage.Cache, k string) string {
 				result = "-1"
 				return
 			}
-			// fmt.Println(int(time.Since(dataCache.TTL).Seconds()) * -1)
 			result = protocol.Number(int(time.Until(*dataCache.ExpiresAt).Seconds()))
 		} else {
 			result = "-2"

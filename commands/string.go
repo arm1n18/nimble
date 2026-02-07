@@ -55,7 +55,19 @@ func getKeysByPattern(m map[string]*storage.CacheData, pattern string, lim int) 
 	return args
 }
 
-// Store data of string type in the cache
+/*
+Set the value of a key with optional expiration.
+
+Description:
+
+	Sets the value of KEY to VALUE with optional expiration in seconds.
+
+Example:
+  - Pattern: SET KEY "VALUE" 60
+
+Notes:
+  - Returns OK on success.
+*/
 func SET(c *storage.Cache, k, v, t string) string {
 	var result string
 
@@ -94,15 +106,26 @@ func SET(c *storage.Cache, k, v, t string) string {
 	return result
 }
 
-// Store data of string type in the cache
+/*
+Set the values of a key with optional expiration.
+
+Description:
+
+	Sets the values of specified KEYS to their VALUES.
+	All keys are set WITHOUT expiration.
+
+Example:
+  - Pattern: MSET KEY_1 "VALUE_1" KEY_2 "VALUE_2"
+
+Notes:
+  - By default MSET doesn`t support TTK.
+    Use SET with expiration options or apply TTL separately after MSET.
+  - Returns OK on success.
+*/
 func MSET(c *storage.Cache, args ...string) string {
 	var result string
 
 	if len(args)%2 == 0 && len(args) != 0 {
-		// if ok := removeQuotes(&s, 1, 1); !ok {
-		// 	return
-		// }
-
 		for i := 0; i < len(args); i += 2 {
 			k, _ := args[i], args[i+1]
 
@@ -134,27 +157,25 @@ func MSET(c *storage.Cache, args ...string) string {
 	return result
 }
 
-// Get string type of data from the cache
+/*
+Get the values of a key.
+
+Description:
+
+	Returns the value associated with KEY.
+
+Example:
+  - Pattern: GET KEY
+
+Notes:
+  - Returns the value of the key as a string, or null if the key does not exist.
+*/
 func GET(c *storage.Cache, k string) string {
 	var result string
 
 	c.WithRWLock(func() {
 		if cd, exists := c.GetUnsafe(k); exists {
 			cd.Requests++
-
-			// m, ok := cd.Value.(map[string]struct{})
-			// if ok {
-			// 	tS := make([]string, 0, len(m))
-
-			// 	for k := range m {
-			// 		tS = append(tS, k)
-			// 	}
-
-			// 	cV = tS
-			// } else {
-			// 	cV = cd.Value
-			// }
-
 			result = protocol.String(cd.Value)
 			return
 		} else {
@@ -166,7 +187,19 @@ func GET(c *storage.Cache, k string) string {
 	return result
 }
 
-// Get string type of data from the cache
+/*
+Get the values of multiple keys.
+
+Description:
+
+	Returns the values associated with the specified KEYS.
+
+Example:
+  - Pattern: MGET KEY_1 KEY_2
+
+Notes:
+  - Returns an array of values or nulls.
+*/
 func MGET(c *storage.Cache, args ...string) string {
 	var result string
 
@@ -176,20 +209,6 @@ func MGET(c *storage.Cache, args ...string) string {
 		for _, k := range args {
 			if cd, exists := c.GetUnsafe(k); exists {
 				cd.Requests++
-
-				// m, ok := cd.Value.(map[string]string{})
-				// if ok {
-				// 	tS := make([]string, 0, len(m))
-
-				// 	for k := range m {
-				// 		tS = append(tS, k)
-				// 	}
-
-				// 	cV = tS
-				// } else {
-				// 	cV = cd.Value
-				// }
-
 				arr = append(arr, cd.Value)
 			} else {
 				arr = append(arr, protocol.Nil())

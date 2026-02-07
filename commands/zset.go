@@ -52,6 +52,28 @@ func addZOrder(s []ZItem, i ZItem) []ZItem {
 	return append(s, i)
 }
 
+func updateZOrder(s []ZItem, i ZItem) []ZItem {
+	found := false
+
+	for index, v := range s {
+		if v.Member == i.Member {
+			s[index].Score = i.Score
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		s = append(s, i)
+	}
+
+	sort.Slice(s, func(a, b int) bool {
+		return s[a].Score > s[b].Score
+	})
+
+	return s
+}
+
 func sortZOrder(m map[string]float64) []ZItem {
 	s := make([]ZItem, 0, len(m))
 
@@ -79,17 +101,26 @@ func removeZOrder(o []ZItem, t string) []ZItem {
 	return o
 }
 
+/*
+Add one member to a sorted set.
+
+Description:
+
+	Adds the specified values to the zset with score. Duplicate values are ignored.
+
+Example:
+  - Pattern: ZADD ZSET_NAME "VALUE" 120
+
+Notes:
+  - Returns 1 on success, 0 on failure.
+  - If the member already exists, its score is updated.
+*/
 func ZADD(c *storage.Cache, z, v, s string) string {
 	var result string
 
 	score, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		// return protocol.ErrorMessage("Index must be a number: %s", s)
 		return protocol.ErrNotANumber.Error()
-	}
-
-	if score < 0 {
-		return protocol.ErrInvalidScore.Error()
 	}
 
 	c.WithLock(func() {
@@ -115,13 +146,19 @@ func ZADD(c *storage.Cache, z, v, s string) string {
 		cd.Requests++
 		zs, ok := parseZSet(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn't a zset", z)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
 
 		if _, existsInSet := zs.Items[v]; existsInSet {
-			result = protocol.Failure()
+			zs.Items[v] = score
+			zs.Order = updateZOrder(zs.Order, ZItem{
+				Member: v,
+				Score:  score,
+			})
+			cd.Value = serializeZSet(*zs)
+
+			result = protocol.Success()
 		} else {
 			zs.Items[v] = score
 			zs.Order = addZOrder(zs.Order, ZItem{
@@ -137,13 +174,25 @@ func ZADD(c *storage.Cache, z, v, s string) string {
 	return result
 }
 
+/*
+Remove one member from a sorted set.
+
+Description:
+
+	Removes the specified MEMBER from the sorted set stored at ZSET_NAME.
+
+Example:
+  - Pattern: ZREM ZSET_NAME "VALUE"
+
+Notes:
+  - Returns 1 on success, 0 on failure.
+*/
 func ZREM(c *storage.Cache, z, v string) string {
 	var result string
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = protocol.ErrorMessage("Can`t find %v in memory", z)
 			result = protocol.Failure()
 			return
 		} else {
@@ -151,7 +200,6 @@ func ZREM(c *storage.Cache, z, v string) string {
 
 			zs, ok := parseZSet(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("%s isn't a set", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -172,6 +220,20 @@ func ZREM(c *storage.Cache, z, v string) string {
 	return result
 }
 
+/*
+Return a range of members from a sorted set.
+
+Description:
+
+	Returns the members of the sorted set stored at ZSET_NAME from position MIN to MAX.
+
+Example:
+  - Pattern: ZRANGE ZSET_NAME MIN MAX
+
+Notes:
+  - Returns an array of members in the specified range.
+  - IN FUTURE WILL BE ADDED ZRANGEBYSCORE
+*/
 func ZRANGE(c *storage.Cache, z, s, e string) string {
 	var result string
 
@@ -181,7 +243,6 @@ func ZRANGE(c *storage.Cache, z, s, e string) string {
 
 			cd, exists := c.GetUnsafe(z)
 			if !exists {
-				// result = protocol.ErrorMessage("can`t find %v in memory", z)
 				result = protocol.Array("[]")
 				return
 			}
@@ -190,7 +251,6 @@ func ZRANGE(c *storage.Cache, z, s, e string) string {
 
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				// result = protocol.ErrorMessage("%s isn't a zset", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -214,14 +274,26 @@ func ZRANGE(c *storage.Cache, z, s, e string) string {
 	return result
 }
 
+/*
+Get the score of a member in a sorted set.
+
+Description:
+
+	Returns the score associated with the specified MEMBER in the sorted set stored at ZSET_NAME.
+
+Example:
+  - Pattern: SCORE ZSET_NAME "VALUE"
+
+Notes:
+  - Returns the score as a string or null if the member does not exist.
+*/
 func SCORE(c *storage.Cache, z, k string) string {
 	var result string
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// protocol.ErrorMessage("Can`t find %v in memory", z)
-			result = protocol.Number(-1)
+			result = protocol.Nil()
 			return
 		} else {
 			cd.Requests++
@@ -232,7 +304,6 @@ func SCORE(c *storage.Cache, z, k string) string {
 					result = protocol.Number(-1)
 				}
 			} else {
-				// protocol.ErrorMessage("%s isn't a zset", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}
@@ -242,6 +313,19 @@ func SCORE(c *storage.Cache, z, k string) string {
 	return result
 }
 
+/*
+Get the scores of specific members in a sorted set.
+
+Description:
+
+	Returns an array of scores corresponding to the specified MEMBERS in the list stored at ZSET_NAME.
+
+Example:
+  - Pattern: LSCORE ZSET_NAME "VALUE_1" "VALUE_2"
+
+Notes:
+  - Returns an array of numbers or nulls.
+*/
 func LSCORE(c *storage.Cache, z string, args ...string) string {
 	var result string
 
@@ -250,7 +334,6 @@ func LSCORE(c *storage.Cache, z string, args ...string) string {
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			// result = protocol.ErrorMessage("Can`t find %v in memory", z)
 			result = protocol.Array("[]")
 			return
 		} else {
@@ -260,11 +343,10 @@ func LSCORE(c *storage.Cache, z string, args ...string) string {
 					if s, ok := zs.Items[k]; ok {
 						arr = append(arr, serializeFloat(s))
 					} else {
-						arr = append(arr, "-1")
+						arr = append(arr, "-nil")
 					}
 				}
 			} else {
-				// protocol.ErrorMessage("%s isn't a zset", z)
 				result = protocol.ErrMismatchType.Error()
 				return
 			}

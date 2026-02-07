@@ -21,7 +21,23 @@ func serializeFloat(v float64) string {
 	return strconv.FormatFloat(v, 'f', -1, 64)
 }
 
-// Increase the number by 1
+/*
+Increase the number by 1.
+
+Description:
+
+	Increments the integer value by 1.
+
+Example:
+
+  - Pattern: INCR "KEY"
+
+  - Result: 1
+
+Notes:
+  - Returns the new value after incrementing.
+  - If the key does not exist, it is set to 0 before incrementing.
+*/
 func INCR(c *storage.Cache, k string) string {
 	var result string
 
@@ -54,7 +70,23 @@ func INCR(c *storage.Cache, k string) string {
 	return result
 }
 
-// Decrease the number by 1
+/*
+Decrease the number by 1.
+
+Description:
+
+	Decrements the integer value by 1.
+
+Example:
+
+  - Pattern: DECR "KEY"
+
+  - Result: -1
+
+Notes:
+  - Returns the new value after decrementing.
+  - If the key does not exist, it is set to 0 before decrementing.
+*/
 func DECR(c *storage.Cache, k string) string {
 	var result string
 
@@ -87,7 +119,23 @@ func DECR(c *storage.Cache, k string) string {
 	return result
 }
 
-// Increase the number by n
+/*
+Increase the number by N.
+
+Description:
+
+	Increments the integer value by N.
+
+Example:
+
+  - Pattern: INCRBY "KEY" 10
+
+  - Result: 10
+
+Notes:
+  - Returns the new value after incrementing.
+  - If the key does not exist, it is set to 0 before incrementing.
+*/
 func INCRBY(c *storage.Cache, k, v string) string {
 	var result string
 
@@ -125,7 +173,23 @@ func INCRBY(c *storage.Cache, k, v string) string {
 	return result
 }
 
-// Decrease the number by n
+/*
+Decrease the number by N.
+
+Description:
+
+	Decrements the integer value by N.
+
+Example:
+
+  - Pattern: DECRBY "KEY" 10
+
+  - Result: -10
+
+Notes:
+  - Returns the new value after decrementing.
+  - If the key does not exist, it is set to 0 before decrementing.
+*/
 func DECRBY(c *storage.Cache, k, v string) string {
 	var result string
 
@@ -163,7 +227,23 @@ func DECRBY(c *storage.Cache, k, v string) string {
 	return result
 }
 
-// Multiply the number by n
+/*
+Multiply the number by N.
+
+Description:
+
+	Multiplies the integer value by N.
+
+Example:
+
+  - Pattern: MUL "KEY" 2
+
+  - Result: 10
+
+Notes:
+  - Returns the new value after multiplication.
+  - If the key does not exist, it is set to 0.
+*/
 func MUL(c *storage.Cache, k, v string) string {
 	var result string
 
@@ -201,7 +281,23 @@ func MUL(c *storage.Cache, k, v string) string {
 	return result
 }
 
-// Divide the number by n
+/*
+Divide the number by N.
+
+Description:
+
+	Divides the integer value by N.
+
+Example:
+
+  - Pattern: DIV "KEY" 2
+
+  - Result: 5
+
+Notes:
+  - Returns the new value after division.
+  - If the key does not exist, it is set to 0.
+*/
 func DIV(c *storage.Cache, k, v string) string {
 	var result string
 

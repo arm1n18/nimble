@@ -6,6 +6,7 @@ import (
 	"net"
 	cmd "nimble/commands"
 	"nimble/config"
+	"nimble/logger"
 	"nimble/parser"
 	"nimble/protocol"
 	"nimble/storage"
@@ -27,6 +28,8 @@ func registerServer(conf *config.Config) {
 	if err != nil {
 		protocol.FatalError("failed to register server: %v\n", err)
 	}
+
+	logger.ServerInfo(*conf)
 
 	defer l.Close()
 

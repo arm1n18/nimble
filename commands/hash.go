@@ -24,15 +24,24 @@ func serializeHash(m map[string]string) string {
 	return string(b)
 }
 
-// Store hashset in the cache
+/*
+Store a key-value pair in a hash.
+
+Description:
+
+	Adds or updates a key-value pair in the hash.
+
+Example:
+  - Pattern: HSET HASH_NAME KEY VALUE
+
+Notes:
+  - Creates the hash if it doesn't exist.
+  - Returns OK on success.
+*/
 func HSET(c *storage.Cache, h string, args ...string) string {
 	var result string
 
 	if len(args)%2 == 0 && len(args) != 0 {
-
-		// if ok := removeQuotes(&s, 0, 1); !ok {
-		// 	return
-		// }
 
 		c.WithLock(func() {
 			hash := make(map[string]string)
@@ -76,7 +85,19 @@ func HSET(c *storage.Cache, h string, args ...string) string {
 	return result
 }
 
-// Get hashset data from the cache by key
+/*
+Get a key value from a hash.
+
+Description:
+
+	Returns the value associated with the specified key in the hash.
+
+Example:
+  - Pattern: HGET HASH_NAME KEY_1 KEY_2
+
+Notes:
+  - Returns an array of values stored by key.
+*/
 func HGET(c *storage.Cache, h string, ks ...string) string {
 	var result string
 
@@ -85,7 +106,6 @@ func HGET(c *storage.Cache, h string, ks ...string) string {
 
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			// todocmd
 			result = protocol.Array("[]")
 			return
 		}
@@ -94,7 +114,6 @@ func HGET(c *storage.Cache, h string, ks ...string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn't a hash", h)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -113,7 +132,19 @@ func HGET(c *storage.Cache, h string, ks ...string) string {
 	return result
 }
 
-// Get hashset data keys
+/*
+Get all key names from a hash.
+
+Description:
+
+	Returns a list of all keys stored in the hash.
+
+Example:
+  - Pattern: HKEYS HASH_NAME
+
+Notes:
+  - Returns an array of all keys.
+*/
 func HKEYS(c *storage.Cache, h string) string {
 	var result string
 
@@ -128,7 +159,6 @@ func HKEYS(c *storage.Cache, h string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn't a hash", h)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -144,14 +174,25 @@ func HKEYS(c *storage.Cache, h string) string {
 	return result
 }
 
-// Get hashset data values
+/*
+Get all values from a hash.
+
+Description:
+
+	Returns a list of all values stored in the hash.
+
+Example:
+  - Pattern: HVALUES HASH_NAME
+
+Notes:
+  - Returns an array of all values.
+*/
 func HVALUES(c *storage.Cache, h string) string {
 	var result string
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			// result = protocol.ErrorMessage("can`t find %v in memory", h)
 			result = protocol.Array("[]")
 			return
 		}
@@ -160,7 +201,6 @@ func HVALUES(c *storage.Cache, h string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn't a hash", h)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -176,7 +216,19 @@ func HVALUES(c *storage.Cache, h string) string {
 	return result
 }
 
-// Get hashset data from the cache by key
+/*
+Delete one or more keys from a hash.
+
+Description:
+
+	Removes the specified keys from the hash.
+
+Example:
+  - Pattern: HDEL HASH_NAME KEY_1 KEY_2
+
+Notes:
+  - Returns the number of deleted keys.
+*/
 func HDEL(c *storage.Cache, h string, args ...string) string {
 	var result string
 
@@ -189,7 +241,6 @@ func HDEL(c *storage.Cache, h string, args ...string) string {
 
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			// result = protocol.ErrorMessage("can`t find %v in memory", h)
 			result = protocol.Number(-1)
 			return
 		}
@@ -198,7 +249,6 @@ func HDEL(c *storage.Cache, h string, args ...string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn't a hash", h)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -221,7 +271,19 @@ func HDEL(c *storage.Cache, h string, args ...string) string {
 	return result
 }
 
-// Check if the keys exist in the hashset and return their quantity
+/*
+Check if keys exist in a hash.
+
+Description:
+
+	Checks if the specified keys exist in the hash.
+
+Example:
+  - Pattern: HCONTAINS HASH_NAME KEY_1 KEY_2
+
+Notes:
+  - Returns the number of specified keys that exist in the hash.
+*/
 func HCONTAINS(c *storage.Cache, h string, args ...string) string {
 	var result string
 
@@ -239,7 +301,6 @@ func HCONTAINS(c *storage.Cache, h string, args ...string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn't a hash", h)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -256,7 +317,22 @@ func HCONTAINS(c *storage.Cache, h string, args ...string) string {
 	return result
 }
 
-// Check if the keys exist in the hashset and return array
+/*
+Check if keys exist in a hash.
+
+Description:
+
+	Checks if the specified keys exist in the hash.
+
+Example:
+
+  - Pattern: LHCONTAINS HASH_NAME KEY_1 KEY_2
+
+  - Result: [1, 0]
+
+Notes:
+  - Returns an array of 1s and 0s, where 1 indicates the key exists and 0 indicates it does not.
+*/
 func LHCONTAINS(c *storage.Cache, h string, args ...string) string {
 	var result string
 
@@ -273,7 +349,6 @@ func LHCONTAINS(c *storage.Cache, h string, args ...string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn't a hash", h)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
@@ -292,7 +367,22 @@ func LHCONTAINS(c *storage.Cache, h string, args ...string) string {
 	return result
 }
 
-// Get hashset length
+/*
+Show the number of stored keys in hash.
+
+Description:
+
+	Returns a number of all stored keys in hash.
+
+Example:
+
+  - Pattern: HLEN HASH_NAME
+
+  - Result: 2
+
+Notes:
+  - Returns the number of all keys that exist in the hash.
+*/
 func HLEN(c *storage.Cache, h string) string {
 	var result string
 
@@ -307,7 +397,6 @@ func HLEN(c *storage.Cache, h string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			// result = protocol.ErrorMessage("%s isn't a hash", h)
 			result = protocol.ErrMismatchType.Error()
 			return
 		}
