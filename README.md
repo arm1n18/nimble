@@ -2,6 +2,18 @@
 
 [![Golang](https://img.shields.io/badge/Golang-%2300ADD8.svg?&logo=go&logoColor=white)](#)
 
+## 🚀 Run Server with Flags
+
+The server supports the following flags:
+
+| Flag | Description | Default |
+|------|------------|---------|
+| --host | Server host | localhost |
+| --port | Server port | 8085 |
+| --mode | Server mode (read-only / read-write) | read-write |
+| --user | Comma-separated users: `user:password,user2:password` | nimble:default |
+
+
 # 📚 Commands
 
 Full list of supported commands grouped by category.
