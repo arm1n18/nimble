@@ -2,6 +2,25 @@
 
 [![Golang](https://img.shields.io/badge/Golang-%2300ADD8.svg?&logo=go&logoColor=white)](#)
 
+## ⚡ Installation
+  - 1️⃣ **Download**
+```bash
+git fetch https://github.com/arm1n18/nimble.git
+cd server
+```
+  - 2️⃣ **Build**
+```bash
+go build -o nimble ./cmd/server
+```
+  - 3️⃣ **Install Globally**
+```bash
+sudo mv nimble /usr/local/bin/
+```
+  - ✅ **Check**
+```bash
+nimble --help
+```
+
 ## 🚀 Run Server with Flags
 
 The server supports the following flags:
