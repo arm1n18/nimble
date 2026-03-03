@@ -1,11 +1,12 @@
 package commands
 
 import (
-	"nimble/parser"
-	"nimble/protocol"
-	"nimble/storage"
 	"strconv"
 	"strings"
+
+	"github.com/arm1n18/nimble/parser"
+	"github.com/arm1n18/nimble/protocol"
+	"github.com/arm1n18/nimble/storage"
 )
 
 /*
@@ -194,7 +195,7 @@ Check if the keys exist and return array.
 
 Description:
 
-	Checargs one or more keys in the cache and returns an array of integers.
+	Checks one or more keys in the cache and returns an array of integers.
 
 Behavior:
   - For each key provided:

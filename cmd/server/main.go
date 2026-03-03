@@ -4,14 +4,15 @@ import (
 	"bufio"
 	"fmt"
 	"net"
-	cmd "nimble/commands"
-	"nimble/config"
-	"nimble/logger"
-	"nimble/parser"
-	"nimble/protocol"
-	"nimble/storage"
 	"strings"
 	"time"
+
+	cmd "github.com/arm1n18/nimble/commands"
+	"github.com/arm1n18/nimble/config"
+	"github.com/arm1n18/nimble/logger"
+	"github.com/arm1n18/nimble/parser"
+	"github.com/arm1n18/nimble/protocol"
+	"github.com/arm1n18/nimble/storage"
 )
 
 type Session struct {

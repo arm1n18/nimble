@@ -1,9 +1,10 @@
 package parser
 
 import (
-	"nimble/protocol"
 	"regexp"
 	"strings"
+
+	"github.com/arm1n18/nimble/protocol"
 )
 
 func ParseCommand(s string) (string, []string) {

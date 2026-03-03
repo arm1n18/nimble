@@ -3,8 +3,9 @@ package logger
 import (
 	"fmt"
 	"log"
-	"nimble/config"
 	"time"
+
+	"github.com/arm1n18/nimble/config"
 )
 
 type Logger struct {

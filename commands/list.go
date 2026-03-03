@@ -2,10 +2,11 @@ package commands
 
 import (
 	"encoding/json"
-	"nimble/protocol"
-	"nimble/storage"
 	"strconv"
 	"time"
+
+	"github.com/arm1n18/nimble/protocol"
+	"github.com/arm1n18/nimble/storage"
 )
 
 func parseList(s string) ([]string, bool) {

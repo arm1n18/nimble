@@ -3,8 +3,9 @@ package config
 import (
 	"flag"
 	"log"
-	"nimble/protocol"
 	"strings"
+
+	"github.com/arm1n18/nimble/protocol"
 )
 
 type User struct {

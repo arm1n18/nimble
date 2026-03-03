@@ -2,9 +2,10 @@ package commands
 
 import (
 	"encoding/json"
-	"nimble/protocol"
-	"nimble/storage"
 	"time"
+
+	"github.com/arm1n18/nimble/protocol"
+	"github.com/arm1n18/nimble/storage"
 )
 
 func parseSet(s string) (map[string]struct{}, bool) {
