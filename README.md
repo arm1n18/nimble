@@ -20,7 +20,6 @@ sudo mv nimble /usr/local/bin/
 ```bash
 nimble --help
 ```
-
 ## 🚀 Run Server with Flags
 
 The server supports the following flags:
@@ -32,6 +31,7 @@ The server supports the following flags:
 | --mode | Server mode (read-only / read-write) | read-write |
 | --user | Comma-separated users: `user:password,user2:password` | nimble:default |
 
+Nimble Server comes with a **Command-Line Interface (CLI)** - [Nimble CLI Repository](https://github.com/arm1n18/nimble_cli)
 
 # 📚 Commands
 
