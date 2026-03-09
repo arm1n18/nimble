@@ -6,7 +6,7 @@
   - 1️⃣ **Download**
 ```bash
 git clone https://github.com/arm1n18/nimble.git
-cd server
+cd nimble
 ```
   - 2️⃣ **Build**
 ```bash
