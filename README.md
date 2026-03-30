@@ -29,8 +29,8 @@ The server supports the following flags:
 | --host | Server host | localhost |
 | --port | Server port | 8085 |
 | --mode | Server mode (read-only / read-write) | read-write |
-| --user | Comma-separated users: `user:password,user2:password` | nimble:default |
 | --hLim | Max server history | 1000 |
+| --user | Comma-separated users: `user:password,user2:password` | nimble:default |
 
 Nimble Server comes with a **Command-Line Interface (CLI)** - [Nimble CLI Repository](https://github.com/arm1n18/nimble_cli)
 
