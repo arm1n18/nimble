@@ -38,11 +38,14 @@ Example:
 Notes:
   - Returns the number of values that were actually added to the set.
 */
-func SADD(c *storage.Cache, z string, args ...string) string {
-	var result string
+func SADD(c *storage.Cache, z string, args ...string) protocol.Response {
+	var res protocol.Response
 
 	if len(args) == 0 {
-		return protocol.ErrNotEnoughValues.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotEnoughValues.Error(),
+		}
 	}
 
 	c.WithLock(func() {
@@ -64,7 +67,10 @@ func SADD(c *storage.Cache, z string, args ...string) string {
 				Requests:  1,
 				CreatedAt: time.Now(),
 			})
-			result = protocol.Number(q)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(q),
+			}
 		} else {
 			cd.Requests++
 			if m, ok := parseSet(cd.Value); ok {
@@ -76,15 +82,21 @@ func SADD(c *storage.Cache, z string, args ...string) string {
 				}
 
 				cd.Value = serializeSet(m)
-				result = protocol.Number(q)
+				res = protocol.Response{
+					Success: true,
+					Output:  protocol.Number(q),
+				}
 			} else {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -100,11 +112,14 @@ Example:
 Notes:
   - Returns the number of values that were actually removes from the set.
 */
-func SREM(c *storage.Cache, z string, args ...string) string {
-	var result string
+func SREM(c *storage.Cache, z string, args ...string) protocol.Response {
+	var res protocol.Response
 
 	if len(args) == 0 {
-		return protocol.ErrNotEnoughValues.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotEnoughValues.Error(),
+		}
 	}
 
 	c.WithLock(func() {
@@ -112,7 +127,10 @@ func SREM(c *storage.Cache, z string, args ...string) string {
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			result = protocol.Failure()
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Failure(),
+			}
 			return
 		} else {
 			cd.Requests++
@@ -125,15 +143,21 @@ func SREM(c *storage.Cache, z string, args ...string) string {
 					}
 				}
 				cd.Value = serializeSet(m)
-				result = protocol.Number(q)
+				res = protocol.Response{
+					Success: true,
+					Output:  protocol.Number(q),
+				}
 			} else {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -149,14 +173,17 @@ Example:
 Notes:
   - Returns the number of specified values that exist in the set.
 */
-func SCONTAINS(c *storage.Cache, z string, args ...string) string {
-	var result string
+func SCONTAINS(c *storage.Cache, z string, args ...string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		var q int
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			result = protocol.Number(-1)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(-1),
+			}
 			return
 		}
 
@@ -166,7 +193,10 @@ func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 			for _, v := range args {
@@ -175,11 +205,17 @@ func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 				}
 			}
 
-			result = protocol.Number(q)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(q),
+			}
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 			for _, v := range args {
@@ -188,14 +224,20 @@ func SCONTAINS(c *storage.Cache, z string, args ...string) string {
 				}
 			}
 
-			result = protocol.Number(q)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(q),
+			}
 		default:
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -214,15 +256,18 @@ Example:
 Notes:
   - Returns an array of 1s and 0s, where 1 indicates the value exists and 0 indicates it does not.
 */
-func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
-	var result string
+func LSCONTAINS(c *storage.Cache, z string, args ...string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		arr := make([]string, len(args))
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			result = protocol.Array("[]")
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array("[]"),
+			}
 			return
 		}
 
@@ -232,7 +277,10 @@ func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 			for i, v := range args {
@@ -243,11 +291,17 @@ func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 				}
 			}
 
-			result = protocol.Array(serializeList(arr))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array(serializeList(arr)),
+			}
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 			for i, v := range args {
@@ -258,14 +312,20 @@ func LSCONTAINS(c *storage.Cache, z string, args ...string) string {
 				}
 			}
 
-			result = protocol.Array(serializeList(arr))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array(serializeList(arr)),
+			}
 		default:
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -284,13 +344,16 @@ Example:
 Notes:
   - Returns the number of all values that exist in the set.
 */
-func SLEN(c *storage.Cache, z string) string {
-	var result string
+func SLEN(c *storage.Cache, z string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			result = protocol.Number(-1)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(-1),
+			}
 			return
 		}
 
@@ -300,24 +363,39 @@ func SLEN(c *storage.Cache, z string) string {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
-			result = protocol.Number(len(m))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(len(m)),
+			}
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
-			result = protocol.Number(len(m.Items))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(len(m.Items)),
+			}
 		default:
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -333,15 +411,18 @@ Example:
 Notes:
   - Returns an array of all values that stored in the set.
 */
-func SMEMBERS(c *storage.Cache, z string) string {
-	var result string
+func SMEMBERS(c *storage.Cache, z string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		var arr []string
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			result = protocol.Array("[]")
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array("[]"),
+			}
 			return
 		}
 
@@ -351,18 +432,27 @@ func SMEMBERS(c *storage.Cache, z string) string {
 		case storage.Set:
 			m, ok := parseSet(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 			for k := range m {
 				arr = append(arr, k)
 			}
 
-			result = protocol.Array(serializeList(arr))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array(serializeList(arr)),
+			}
 		case storage.ZSet:
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 
@@ -370,12 +460,18 @@ func SMEMBERS(c *storage.Cache, z string) string {
 				arr = append(arr, k.Member)
 			}
 
-			result = protocol.Array(serializeList(arr))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array(serializeList(arr)),
+			}
 		default:
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 	})
 
-	return result
+	return res
 }

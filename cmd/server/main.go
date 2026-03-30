@@ -61,11 +61,11 @@ func handleConnection(s *storage.Cache, conn net.Conn, conf *config.Config) {
 			continue
 		}
 
-		response := handleCommand(s, session, conf, line)
-		if response == "Client disconnected" {
+		resp := handleCommand(s, session, conf, line)
+		if resp == "Client disconnected" {
 			return
 		} else {
-			fmt.Fprintln(conn, response)
+			fmt.Fprintln(conn, resp)
 		}
 	}
 }
@@ -120,7 +120,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.SET(s, cmdArgs[0], cmdArgs[1], cmdArgs[2])
+			resp := cmd.SET(s, cmdArgs[0], cmdArgs[1], cmdArgs[2])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "MSET":
 		if len(cmdArgs) < 2 || len(cmdArgs)%2 != 0 {
@@ -132,7 +137,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.MSET(s, cmdArgs...)
+			resp := cmd.MSET(s, cmdArgs...)
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "GET":
 		if len(cmdArgs) != 1 {
@@ -143,7 +153,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.GET(s, cmdArgs[0])
+		resp := cmd.GET(s, cmdArgs[0])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "MGET":
 		if len(cmdArgs) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -153,13 +168,23 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.MGET(s, cmdArgs...)
+		resp := cmd.MGET(s, cmdArgs...)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "KEYS":
 		if len(cmdArgs) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
 		}
 
-		return cmd.KEYS(s, cmdArgs...)
+		resp := cmd.KEYS(s, cmdArgs...)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "HSET":
 		if len(cmdArgs[1:]) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -170,7 +195,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.HSET(s, cmdArgs[0], cmdArgs[1:]...)
+			resp := cmd.HSET(s, cmdArgs[0], cmdArgs[1:]...)
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "HGET":
 		if len(cmdArgs[1:]) == 0 {
@@ -181,7 +211,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.HGET(s, cmdArgs[0], cmdArgs[1:]...)
+		resp := cmd.HGET(s, cmdArgs[0], cmdArgs[1:]...)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "HDEL":
 		if len(cmdArgs[1:]) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -191,7 +226,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.HDEL(s, cmdArgs[0], cmdArgs[1:]...)
+		resp := cmd.HDEL(s, cmdArgs[0], cmdArgs[1:]...)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "HLEN":
 		if len(cmdArgs) > 1 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -201,7 +241,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.HLEN(s, cmdArgs[0])
+		resp := cmd.HLEN(s, cmdArgs[0])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "HKEYS":
 		if len(cmdArgs) > 1 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -211,7 +256,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.HKEYS(s, cmdArgs[0])
+		resp := cmd.HKEYS(s, cmdArgs[0])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "HVALUES":
 		if len(cmdArgs) > 1 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -221,7 +271,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.HVALUES(s, cmdArgs[0])
+		resp := cmd.HVALUES(s, cmdArgs[0])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "DEL":
 		if len(cmdArgs) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -232,7 +287,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.DEL(s, cmdArgs...)
+			resp := cmd.DEL(s, cmdArgs...)
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "COPY":
 		if len(cmdArgs) != 2 {
@@ -244,7 +304,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.COPY(s, cmdArgs[0], cmdArgs[1])
+			resp := cmd.COPY(s, cmdArgs[0], cmdArgs[1])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "RENAME":
 		if len(cmdArgs) != 2 {
@@ -256,7 +321,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.RENAME(s, cmdArgs[0], cmdArgs[1])
+			resp := cmd.RENAME(s, cmdArgs[0], cmdArgs[1])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "ESET":
 		if len(cmdArgs) != 1 {
@@ -268,7 +338,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.ESET(s, cmdArgs[0])
+			resp := cmd.ESET(s, cmdArgs[0])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "LSET":
 		if len(cmdArgs) < 2 {
@@ -280,7 +355,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.LSET(s, cmdArgs[0], cmdArgs[1:]...)
+			resp := cmd.LSET(s, cmdArgs[0], cmdArgs[1:]...)
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "LGET":
 		if len(cmdArgs) < 1 {
@@ -291,7 +371,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.LGET(s, cmdArgs[0], cmdArgs[1:]...)
+		resp := cmd.LGET(s, cmdArgs[0], cmdArgs[1:]...)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "LCLEAR":
 		if len(cmdArgs) > 1 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -301,13 +386,23 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.LCLEAR(s, cmdArgs[0])
+		resp := cmd.LCLEAR(s, cmdArgs[0])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "LLEN":
 		if len(cmdArgs) > 1 {
 			return protocol.ErrInvalidSyntax.Error()
 		}
 
-		return cmd.LLEN(s, cmdArgs[0])
+		resp := cmd.LLEN(s, cmdArgs[0])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "SPUSH":
 		if len(cmdArgs) < 2 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -318,7 +413,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.SPUSH(s, cmdArgs[0], cmdArgs[1:]...)
+			resp := cmd.SPUSH(s, cmdArgs[0], cmdArgs[1:]...)
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "EPUSH":
 		if len(cmdArgs) < 2 {
@@ -330,7 +430,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.EPUSH(s, cmdArgs[0], cmdArgs[1:]...)
+			resp := cmd.EPUSH(s, cmdArgs[0], cmdArgs[1:]...)
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "SPOP":
 		if len(cmdArgs) > 2 {
@@ -345,7 +450,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.SPOP(s, cmdArgs[0], cmdArgs[1])
+			resp := cmd.SPOP(s, cmdArgs[0], cmdArgs[1])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "EPOP":
 		if len(cmdArgs) > 2 {
@@ -360,7 +470,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.EPOP(s, cmdArgs[0], cmdArgs[1])
+			resp := cmd.EPOP(s, cmdArgs[0], cmdArgs[1])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "SRANGE":
 		if len(cmdArgs) != 3 {
@@ -371,7 +486,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.SRANGE(s, cmdArgs[0], cmdArgs[1:])
+		resp := cmd.SRANGE(s, cmdArgs[0], cmdArgs[1:])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "SADD":
 		if len(cmdArgs[1:]) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -382,7 +502,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.SADD(s, cmdArgs[0], cmdArgs[1:]...)
+			resp := cmd.SADD(s, cmdArgs[0], cmdArgs[1:]...)
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "SREM":
 		if len(cmdArgs[1:]) == 0 {
@@ -394,7 +519,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.SREM(s, cmdArgs[0], cmdArgs[1:]...)
+			resp := cmd.SREM(s, cmdArgs[0], cmdArgs[1:]...)
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "SLEN":
 		if len(cmdArgs) > 1 {
@@ -405,7 +535,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.SLEN(s, cmdArgs[0])
+		resp := cmd.SLEN(s, cmdArgs[0])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "SMEMBERS":
 		if len(cmdArgs) > 1 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -415,7 +550,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.SMEMBERS(s, cmdArgs[0])
+		resp := cmd.SMEMBERS(s, cmdArgs[0])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "ZADD":
 		if len(cmdArgs) != 3 {
 			return protocol.ErrorMessage("Ivalid syntax")
@@ -425,7 +565,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.ZADD(s, cmdArgs[0], cmdArgs[1], cmdArgs[2])
+		resp := cmd.ZADD(s, cmdArgs[0], cmdArgs[1], cmdArgs[2])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "ZREM":
 		if len(cmdArgs) != 2 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -435,7 +580,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.ZREM(s, cmdArgs[0], cmdArgs[1])
+		resp := cmd.ZREM(s, cmdArgs[0], cmdArgs[1])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "ZRANGE":
 		if len(cmdArgs) != 3 {
 			return protocol.ErrorMessage("Ivalid syntax")
@@ -445,7 +595,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.ZRANGE(s, cmdArgs[0], cmdArgs[1], cmdArgs[2])
+		resp := cmd.ZRANGE(s, cmdArgs[0], cmdArgs[1], cmdArgs[2])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "SCORE":
 		if len(cmdArgs) != 2 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -455,7 +610,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.SCORE(s, cmdArgs[0], cmdArgs[1])
+		resp := cmd.SCORE(s, cmdArgs[0], cmdArgs[1])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "LSCORE":
 		if len(cmdArgs) < 2 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -465,7 +625,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.LSCORE(s, cmdArgs[0], cmdArgs[1:]...)
+		resp := cmd.LSCORE(s, cmdArgs[0], cmdArgs[1:]...)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "TTK":
 		if len(cmdArgs) != 2 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -476,7 +641,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.TTK(s, cmdArgs[0], cmdArgs[1])
+			resp := cmd.TTK(s, cmdArgs[0], cmdArgs[1])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "TTL":
 		if len(cmdArgs) != 1 {
@@ -487,11 +657,26 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.TTL(s, cmdArgs[0])
+		resp := cmd.TTL(s, cmdArgs[0])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "LIST":
-		return cmd.LIST(s)
+		resp := cmd.LIST(s)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "LISTLEN":
-		return cmd.LISTLEN(s)
+		resp := cmd.LISTLEN(s)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "INCR":
 		if len(cmdArgs) > 2 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -502,7 +687,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.INCR(s, cmdArgs[0])
+			resp := cmd.INCR(s, cmdArgs[0])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "DECR":
 		if len(cmdArgs) > 2 {
@@ -514,7 +704,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.DECR(s, cmdArgs[0])
+			resp := cmd.DECR(s, cmdArgs[0])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "INCRBY":
 		if len(cmdArgs) > 2 {
@@ -526,7 +721,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.INCRBY(s, cmdArgs[0], cmdArgs[1])
+			resp := cmd.INCRBY(s, cmdArgs[0], cmdArgs[1])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "DECRBY":
 		if len(cmdArgs) > 2 {
@@ -538,7 +738,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.DECRBY(s, cmdArgs[0], cmdArgs[1])
+			resp := cmd.DECRBY(s, cmdArgs[0], cmdArgs[1])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "MUL":
 		if len(cmdArgs) > 2 {
@@ -550,7 +755,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.MUL(s, cmdArgs[0], cmdArgs[1])
+			resp := cmd.MUL(s, cmdArgs[0], cmdArgs[1])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "DIV":
 		if len(cmdArgs) > 2 {
@@ -562,7 +772,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		}
 
 		return conf.ReadOnlyMiddleware(func() string {
-			return cmd.DIV(s, cmdArgs[0], cmdArgs[1])
+			resp := cmd.DIV(s, cmdArgs[0], cmdArgs[1])
+			if resp.Success {
+				// add cmd to stack
+			}
+
+			return resp.Output
 		})
 	case "EXISTS":
 		if len(cmdArgs) == 0 {
@@ -573,7 +788,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.EXISTS(s, cmdArgs...)
+		resp := cmd.EXISTS(s, cmdArgs...)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "LEXISTS":
 		if len(cmdArgs[1:]) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -583,7 +803,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.LEXISTS(s, cmdArgs...)
+		resp := cmd.LEXISTS(s, cmdArgs...)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "HCONTAINS":
 		if len(cmdArgs[1:]) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -593,7 +818,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.HCONTAINS(s, cmdArgs[0], cmdArgs[1:]...)
+		resp := cmd.HCONTAINS(s, cmdArgs[0], cmdArgs[1:]...)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "LHCONTAINS":
 		if len(cmdArgs[1:]) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -603,7 +833,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.LHCONTAINS(s, cmdArgs[0], cmdArgs[1:]...)
+		resp := cmd.LHCONTAINS(s, cmdArgs[0], cmdArgs[1:]...)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "CONTAINS":
 		if len(cmdArgs[1:]) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -613,7 +848,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.CONTAINS(s, cmdArgs[0], cmdArgs[1:])
+		resp := cmd.CONTAINS(s, cmdArgs[0], cmdArgs[1:])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "LCONTAINS":
 		if len(cmdArgs[1:]) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -623,7 +863,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.LCONTAINS(s, cmdArgs[0], cmdArgs[1:])
+		resp := cmd.LCONTAINS(s, cmdArgs[0], cmdArgs[1:])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "SCONTAINS":
 		if len(cmdArgs[1:]) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -633,7 +878,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.SCONTAINS(s, cmdArgs[0], cmdArgs[1:]...)
+		resp := cmd.SCONTAINS(s, cmdArgs[0], cmdArgs[1:]...)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "LSCONTAINS":
 		if len(cmdArgs[1:]) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -643,7 +893,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.LSCONTAINS(s, cmdArgs[0], cmdArgs[1:]...)
+		resp := cmd.LSCONTAINS(s, cmdArgs[0], cmdArgs[1:]...)
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "INDEXOF":
 		if len(cmdArgs[1:]) == 0 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -653,7 +908,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.INDEXOF(s, cmdArgs[0], cmdArgs[1])
+		resp := cmd.INDEXOF(s, cmdArgs[0], cmdArgs[1])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "TYPE":
 		if len(cmdArgs) > 1 {
 			return protocol.ErrInvalidSyntax.Error()
@@ -663,7 +923,12 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 			return protocol.ErrWrongKey.Error()
 		}
 
-		return cmd.TYPE(s, cmdArgs[0])
+		resp := cmd.TYPE(s, cmdArgs[0])
+		if resp.Success {
+			// add cmd to stack
+		}
+
+		return resp.Output
 	case "MODE":
 		if len(cmdArgs) == 0 {
 			return fmt.Sprint(conf.GetMode())

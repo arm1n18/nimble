@@ -6,6 +6,11 @@ import (
 	"os"
 )
 
+type Response struct {
+	Success bool
+	Output  string
+}
+
 type NumberType interface {
 	int | float64
 }

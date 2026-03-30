@@ -39,51 +39,56 @@ Notes:
   - Creates the hash if it doesn't exist.
   - Returns OK on success.
 */
-func HSET(c *storage.Cache, h string, args ...string) string {
-	var result string
+func HSET(c *storage.Cache, h string, args ...string) protocol.Response {
+	var res string
 
-	if len(args)%2 == 0 && len(args) != 0 {
-
-		c.WithLock(func() {
-			hash := make(map[string]string)
-
-			if cd, exists := c.GetUnsafe(h); exists {
-				cd.Requests++
-
-				if m, ok := parseHash(cd.Value); ok {
-					for i := 0; i < len(args); i += 2 {
-						m[args[i]] = args[i+1]
-					}
-
-					c.SetUnsafe(h, &storage.CacheData{
-						Value:    serializeHash(m),
-						Type:     storage.Hash,
-						Requests: cd.Requests + 1,
-					})
-
-					result = protocol.Ok()
-					return
-				}
-			}
-
-			for i := 0; i < len(args); i += 2 {
-				hash[args[i]] = args[i+1]
-			}
-
-			c.SetUnsafe(h, &storage.CacheData{
-				Value:     serializeHash(hash),
-				Type:      storage.Hash,
-				Requests:  1,
-				CreatedAt: time.Now(),
-			})
-
-			result = protocol.Ok()
-		})
-	} else {
-		return protocol.ErrNotEnoughValues.Error()
+	if len(args) == 0 || len(args)%2 != 0 {
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotEnoughValues.Error(),
+		}
 	}
 
-	return result
+	c.WithLock(func() {
+		hash := make(map[string]string)
+
+		if cd, exists := c.GetUnsafe(h); exists {
+			cd.Requests++
+
+			if m, ok := parseHash(cd.Value); ok {
+				for i := 0; i < len(args); i += 2 {
+					m[args[i]] = args[i+1]
+				}
+
+				c.SetUnsafe(h, &storage.CacheData{
+					Value:    serializeHash(m),
+					Type:     storage.Hash,
+					Requests: cd.Requests + 1,
+				})
+
+				res = protocol.Ok()
+				return
+			}
+		}
+
+		for i := 0; i < len(args); i += 2 {
+			hash[args[i]] = args[i+1]
+		}
+
+		c.SetUnsafe(h, &storage.CacheData{
+			Value:     serializeHash(hash),
+			Type:      storage.Hash,
+			Requests:  1,
+			CreatedAt: time.Now(),
+		})
+
+		res = protocol.Ok()
+	})
+
+	return protocol.Response{
+		Success: true,
+		Output:  res,
+	}
 }
 
 /*
@@ -99,15 +104,18 @@ Example:
 Notes:
   - Returns an array of values stored by key.
 */
-func HGET(c *storage.Cache, h string, ks ...string) string {
-	var result string
+func HGET(c *storage.Cache, h string, ks ...string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		arr := make([]string, len(ks))
 
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = protocol.Array("[]")
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array("[]"),
+			}
 			return
 		}
 
@@ -115,7 +123,10 @@ func HGET(c *storage.Cache, h string, ks ...string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
@@ -127,10 +138,13 @@ func HGET(c *storage.Cache, h string, ks ...string) string {
 			}
 		}
 
-		result = protocol.Array(serializeList(arr))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Array(serializeList(arr)),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -146,13 +160,16 @@ Example:
 Notes:
   - Returns an array of all keys.
 */
-func HKEYS(c *storage.Cache, h string) string {
-	var result string
+func HKEYS(c *storage.Cache, h string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = protocol.Array("[]")
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array("[]"),
+			}
 			return
 		}
 
@@ -160,7 +177,10 @@ func HKEYS(c *storage.Cache, h string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
@@ -169,10 +189,13 @@ func HKEYS(c *storage.Cache, h string) string {
 			s = append(s, k)
 		}
 
-		result = protocol.Array(serializeList(s))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Array(serializeList(s)),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -188,13 +211,16 @@ Example:
 Notes:
   - Returns an array of all values.
 */
-func HVALUES(c *storage.Cache, h string) string {
-	var result string
+func HVALUES(c *storage.Cache, h string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = protocol.Array("[]")
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array("[]"),
+			}
 			return
 		}
 
@@ -202,7 +228,10 @@ func HVALUES(c *storage.Cache, h string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
@@ -211,10 +240,13 @@ func HVALUES(c *storage.Cache, h string) string {
 			s = append(s, v)
 		}
 
-		result = protocol.Array(serializeList(s))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Array(serializeList(s)),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -230,11 +262,14 @@ Example:
 Notes:
   - Returns the number of deleted keys.
 */
-func HDEL(c *storage.Cache, h string, args ...string) string {
-	var result string
+func HDEL(c *storage.Cache, h string, args ...string) protocol.Response {
+	var res protocol.Response
 
 	if len(args) == 0 {
-		return protocol.ErrNotEnoughValues.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotEnoughValues.Error(),
+		}
 	}
 
 	c.WithLock(func() {
@@ -242,7 +277,10 @@ func HDEL(c *storage.Cache, h string, args ...string) string {
 
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = protocol.Number(-1)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(-1),
+			}
 			return
 		}
 
@@ -250,7 +288,10 @@ func HDEL(c *storage.Cache, h string, args ...string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
@@ -266,10 +307,13 @@ func HDEL(c *storage.Cache, h string, args ...string) string {
 			Requests: cd.Requests + 1,
 		})
 
-		result = protocol.Number(q)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(q),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -285,16 +329,18 @@ Example:
 Notes:
   - Returns the number of specified keys that exist in the hash.
 */
-func HCONTAINS(c *storage.Cache, h string, args ...string) string {
-	var result string
+func HCONTAINS(c *storage.Cache, h string, args ...string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		var q int
 
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = protocol.ErrorMessage("can`t find %v in memory", h)
-			result = protocol.Number(-1)
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.Number(-1),
+			}
 			return
 		}
 
@@ -302,7 +348,10 @@ func HCONTAINS(c *storage.Cache, h string, args ...string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
@@ -312,10 +361,13 @@ func HCONTAINS(c *storage.Cache, h string, args ...string) string {
 			}
 		}
 
-		result = protocol.Number(q)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(q),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -329,20 +381,23 @@ Example:
 
   - Pattern: LHCONTAINS HASH_NAME KEY_1 KEY_2
 
-  - Result: [1, 0]
+  - res: [1, 0]
 
 Notes:
   - Returns an array of 1s and 0s, where 1 indicates the key exists and 0 indicates it does not.
 */
-func LHCONTAINS(c *storage.Cache, h string, args ...string) string {
-	var result string
+func LHCONTAINS(c *storage.Cache, h string, args ...string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		arr := make([]string, len(args))
 
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = protocol.Array("[]")
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array("[]"),
+			}
 			return
 		}
 
@@ -350,7 +405,10 @@ func LHCONTAINS(c *storage.Cache, h string, args ...string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
@@ -362,10 +420,13 @@ func LHCONTAINS(c *storage.Cache, h string, args ...string) string {
 			}
 		}
 
-		result = protocol.Array(serializeList(arr))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Array(serializeList(arr)),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -379,18 +440,21 @@ Example:
 
   - Pattern: HLEN HASH_NAME
 
-  - Result: 2
+  - res: 2
 
 Notes:
   - Returns the number of all keys that exist in the hash.
 */
-func HLEN(c *storage.Cache, h string) string {
-	var result string
+func HLEN(c *storage.Cache, h string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(h)
 		if !exists {
-			result = protocol.Number(-1)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(-1),
+			}
 			return
 		}
 
@@ -398,12 +462,18 @@ func HLEN(c *storage.Cache, h string) string {
 
 		m, ok := parseHash(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
-		result = protocol.Number(len(m))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(len(m)),
+		}
 	})
 
-	return result
+	return res
 }

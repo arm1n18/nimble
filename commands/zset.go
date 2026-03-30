@@ -116,12 +116,15 @@ Notes:
   - Returns 1 on success, 0 on failure.
   - If the member already exists, its score is updated.
 */
-func ZADD(c *storage.Cache, z, v, s string) string {
-	var result string
+func ZADD(c *storage.Cache, z, v, s string) protocol.Response {
+	var res protocol.Response
 
 	score, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		return protocol.ErrNotANumber.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotANumber.Error(),
+		}
 	}
 
 	c.WithLock(func() {
@@ -140,14 +143,20 @@ func ZADD(c *storage.Cache, z, v, s string) string {
 				Requests:  1,
 				CreatedAt: time.Now(),
 			})
-			result = protocol.Success()
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Success(),
+			}
 			return
 		}
 
 		cd.Requests++
 		zs, ok := parseZSet(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
@@ -159,7 +168,10 @@ func ZADD(c *storage.Cache, z, v, s string) string {
 			})
 			cd.Value = serializeZSet(*zs)
 
-			result = protocol.Success()
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Success(),
+			}
 		} else {
 			zs.Items[v] = score
 			zs.Order = addZOrder(zs.Order, ZItem{
@@ -168,11 +180,14 @@ func ZADD(c *storage.Cache, z, v, s string) string {
 			})
 			cd.Value = serializeZSet(*zs)
 
-			result = protocol.Success()
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Success(),
+			}
 		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -188,20 +203,26 @@ Example:
 Notes:
   - Returns 1 on success, 0 on failure.
 */
-func ZREM(c *storage.Cache, z, v string) string {
-	var result string
+func ZREM(c *storage.Cache, z, v string) protocol.Response {
+	var res protocol.Response
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			result = protocol.Failure()
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Failure(),
+			}
 			return
 		} else {
 			cd.Requests++
 
 			zs, ok := parseZSet(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 
@@ -210,15 +231,21 @@ func ZREM(c *storage.Cache, z, v string) string {
 
 				zs.Order = removeZOrder(zs.Order, v)
 				cd.Value = serializeZSet(*zs)
-				result = protocol.Success()
+				res = protocol.Response{
+					Success: true,
+					Output:  protocol.Success(),
+				}
 			} else {
-				result = protocol.Failure()
+				res = protocol.Response{
+					Success: true,
+					Output:  protocol.Failure(),
+				}
 			}
 
 		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -235,8 +262,8 @@ Notes:
   - Returns an array of members in the specified range.
   - IN FUTURE WILL BE ADDED ZRANGEBYSCORE
 */
-func ZRANGE(c *storage.Cache, z, s, e string) string {
-	var result string
+func ZRANGE(c *storage.Cache, z, s, e string) protocol.Response {
+	var res protocol.Response
 
 	if (s == "max" && e == "min") || (e == "max" && s == "min") {
 		c.WithRWLock(func() {
@@ -244,7 +271,10 @@ func ZRANGE(c *storage.Cache, z, s, e string) string {
 
 			cd, exists := c.GetUnsafe(z)
 			if !exists {
-				result = protocol.Array("[]")
+				res = protocol.Response{
+					Success: true,
+					Output:  protocol.Array("[]"),
+				}
 				return
 			}
 
@@ -252,7 +282,10 @@ func ZRANGE(c *storage.Cache, z, s, e string) string {
 
 			m, ok := parseZSet(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 
@@ -266,13 +299,19 @@ func ZRANGE(c *storage.Cache, z, s, e string) string {
 				}
 			}
 
-			result = protocol.Array(serializeZItems(arr...))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array(serializeZItems(arr...)),
+			}
 		})
 	} else {
-		return protocol.ErrInvalidSyntax.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrInvalidSyntax.Error(),
+		}
 	}
 
-	return result
+	return res
 }
 
 /*
@@ -288,30 +327,42 @@ Example:
 Notes:
   - Returns the score as a string or null if the member does not exist.
 */
-func SCORE(c *storage.Cache, z, k string) string {
-	var result string
+func SCORE(c *storage.Cache, z, k string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			result = protocol.Nil()
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Nil(),
+			}
 			return
 		} else {
 			cd.Requests++
 			if zs, ok := parseZSet(cd.Value); ok {
 				if s, ok := zs.Items[k]; ok {
-					result = protocol.Number(s)
+					res = protocol.Response{
+						Success: true,
+						Output:  protocol.Number(s),
+					}
 				} else {
-					result = protocol.Number(-1)
+					res = protocol.Response{
+						Success: true,
+						Output:  protocol.Number(-1),
+					}
 				}
 			} else {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -327,15 +378,18 @@ Example:
 Notes:
   - Returns an array of numbers or nulls.
 */
-func LSCORE(c *storage.Cache, z string, args ...string) string {
-	var result string
+func LSCORE(c *storage.Cache, z string, args ...string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		arr := make([]string, 0, len(args))
 
 		cd, exists := c.GetUnsafe(z)
 		if !exists {
-			result = protocol.Array("[]")
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array("[]"),
+			}
 			return
 		} else {
 			cd.Requests++
@@ -348,13 +402,19 @@ func LSCORE(c *storage.Cache, z string, args ...string) string {
 					}
 				}
 			} else {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 		}
 
-		result = protocol.Array(serializeList(arr))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Array(serializeList(arr)),
+		}
 	})
 
-	return result
+	return res
 }

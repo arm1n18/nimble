@@ -37,8 +37,8 @@ Notes:
   - If the key already exists, it will be overwritten.
   - Returns OK on success.
 */
-func ESET(c *storage.Cache, l string) string {
-	var result string
+func ESET(c *storage.Cache, l string) protocol.Response {
+	var res protocol.Response
 
 	c.WithLock(func() {
 		arr := make([]string, 0)
@@ -50,10 +50,13 @@ func ESET(c *storage.Cache, l string) string {
 			CreatedAt: time.Now(),
 		})
 
-		result = protocol.Success()
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Success(),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -69,11 +72,14 @@ Example:
 Notes:
   - Returns the number of values that were set.
 */
-func LSET(c *storage.Cache, l string, s ...string) string {
-	var result string
+func LSET(c *storage.Cache, l string, s ...string) protocol.Response {
+	var res protocol.Response
 
 	if len(s) == 0 || len(s)%2 != 0 {
-		return protocol.ErrNotEnoughValues.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotEnoughValues.Error(),
+		}
 	}
 
 	c.WithLock(func() {
@@ -88,7 +94,10 @@ func LSET(c *storage.Cache, l string, s ...string) string {
 			var ok bool
 			arr, ok = parseList(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 		}
@@ -100,7 +109,10 @@ func LSET(c *storage.Cache, l string, s ...string) string {
 			}
 
 			if index < 0 {
-				result = protocol.ErrInvalidRange.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrInvalidRange.Error(),
+				}
 				continue
 			}
 
@@ -126,10 +138,13 @@ func LSET(c *storage.Cache, l string, s ...string) string {
 			cd.Requests++
 		}
 
-		result = protocol.Number(q)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(q),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -145,26 +160,35 @@ Example:
 Notes:
   - Returns an array of values with specified index.
 */
-func LGET(c *storage.Cache, l string, s ...string) string {
-	var result string
+func LGET(c *storage.Cache, l string, s ...string) protocol.Response {
+	var res protocol.Response
 
 	if len(s) == 0 {
-		return protocol.ErrNotEnoughValues.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotEnoughValues.Error(),
+		}
 	}
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			result = protocol.Array("[]")
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array("[]"),
+			}
 			return
 		} else {
 			list, ok := parseList(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 
-			res := make([]string, 0, len(s))
+			arr := make([]string, 0, len(s))
 			for _, v := range s {
 				index, err := strconv.Atoi(v)
 				if err != nil {
@@ -172,18 +196,21 @@ func LGET(c *storage.Cache, l string, s ...string) string {
 				}
 
 				if index < 0 || index >= len(list) {
-					res = append(res, protocol.Nil())
+					arr = append(arr, protocol.Nil())
 					continue
 				}
 
-				res = append(res, list[index])
+				arr = append(arr, list[index])
 			}
 
-			result = protocol.Array(serializeList(res))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array(serializeList(arr)),
+			}
 		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -199,11 +226,14 @@ Example:
 Notes:
   - Returns the new length of the list after the push.
 */
-func SPUSH(c *storage.Cache, l string, s ...string) string {
-	var result string
+func SPUSH(c *storage.Cache, l string, s ...string) protocol.Response {
+	var res protocol.Response
 
 	if len(s) == 0 {
-		return protocol.ErrNotEnoughValues.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotEnoughValues.Error(),
+		}
 	}
 
 	c.WithLock(func() {
@@ -219,11 +249,17 @@ func SPUSH(c *storage.Cache, l string, s ...string) string {
 				CreatedAt: time.Now(),
 			})
 
-			result = protocol.Number(len(value))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(len(value)),
+			}
 		} else {
 			arr, ok := parseList(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 
@@ -231,12 +267,15 @@ func SPUSH(c *storage.Cache, l string, s ...string) string {
 			cd.Value = serializeList(arr)
 			cd.Requests++
 
-			result = protocol.Number(len(arr))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(len(arr)),
+			}
 		}
 
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -252,11 +291,14 @@ Example:
 Notes:
   - Returns the new length of the list after the push.
 */
-func EPUSH(c *storage.Cache, l string, s ...string) string {
-	var result string
+func EPUSH(c *storage.Cache, l string, s ...string) protocol.Response {
+	var res protocol.Response
 
 	if len(s) == 0 {
-		return protocol.ErrNotEnoughValues.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotEnoughValues.Error(),
+		}
 	}
 
 	c.WithLock(func() {
@@ -272,11 +314,17 @@ func EPUSH(c *storage.Cache, l string, s ...string) string {
 				CreatedAt: time.Now(),
 			})
 
-			result = protocol.Number(len(s))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(len(s)),
+			}
 		} else {
 			arr, ok := parseList(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 
@@ -284,11 +332,14 @@ func EPUSH(c *storage.Cache, l string, s ...string) string {
 			cd.Value = serializeList(arr)
 			cd.Requests++
 
-			result = protocol.Number(len(arr))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(len(arr)),
+			}
 		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -303,8 +354,8 @@ Example:
 Notes:
   - Returns an array of popped values.
 */
-func SPOP(c *storage.Cache, l, s string) string {
-	var result string
+func SPOP(c *storage.Cache, l, s string) protocol.Response {
+	var res protocol.Response
 
 	q := 1
 
@@ -312,25 +363,37 @@ func SPOP(c *storage.Cache, l, s string) string {
 		var err error
 		q, err = strconv.Atoi(s)
 		if err != nil {
-			return protocol.ErrNotANumber.Error()
+			return protocol.Response{
+				Success: false,
+				Output:  protocol.ErrNotANumber.Error(),
+			}
 		}
 	}
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			result = protocol.Failure()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.Failure(),
+			}
 			return
 		}
 
 		list, ok := parseList(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
 		if len(list) == 0 {
-			result = protocol.Array("[]")
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array("[]"),
+			}
 			return
 		}
 
@@ -342,10 +405,13 @@ func SPOP(c *storage.Cache, l, s string) string {
 		cd.Value = serializeList(list[q:])
 		cd.Requests++
 
-		result = protocol.Array(serializeList(rm))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Array(serializeList(rm)),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -361,8 +427,8 @@ Example:
 Notes:
   - Returns an array of popped values.
 */
-func EPOP(c *storage.Cache, l, s string) string {
-	var result string
+func EPOP(c *storage.Cache, l, s string) protocol.Response {
+	var res protocol.Response
 
 	q := 1
 
@@ -370,25 +436,37 @@ func EPOP(c *storage.Cache, l, s string) string {
 		var err error
 		q, err = strconv.Atoi(s)
 		if err != nil {
-			return protocol.ErrNotANumber.Error()
+			return protocol.Response{
+				Success: false,
+				Output:  protocol.ErrNotANumber.Error(),
+			}
 		}
 	}
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			result = protocol.Failure()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.Failure(),
+			}
 			return
 		}
 
 		list, ok := parseList(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
 		if len(list) == 0 {
-			result = protocol.Array("[]")
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array("[]"),
+			}
 			return
 		}
 
@@ -402,10 +480,13 @@ func EPOP(c *storage.Cache, l, s string) string {
 		cd.Value = serializeList(list[:start])
 		cd.Requests++
 
-		result = protocol.Array(serializeList(rm))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Array(serializeList(rm)),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -421,34 +502,49 @@ Example:
 Notes:
   - Returns an array of elements within the specified range.
 */
-func SRANGE(c *storage.Cache, l string, s []string) string {
-	var result string
+func SRANGE(c *storage.Cache, l string, s []string) protocol.Response {
+	var res protocol.Response
 
 	if len(s) != 2 {
-		return protocol.ErrNotEnoughValues.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotEnoughValues.Error(),
+		}
 	}
 
 	start, err := strconv.Atoi(s[0])
 	if err != nil {
-		return protocol.ErrNotANumber.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotANumber.Error(),
+		}
 	}
 
 	end, err := strconv.Atoi(s[1])
 	if err != nil {
-		return protocol.ErrNotANumber.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotANumber.Error(),
+		}
 	}
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			result = protocol.Array("[]")
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array("[]"),
+			}
 			return
 		}
 
 		v, ok := parseList(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
@@ -463,7 +559,10 @@ func SRANGE(c *storage.Cache, l string, s []string) string {
 		}
 
 		if start > end {
-			result = protocol.ErrInvalidRange.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrInvalidRange.Error(),
+			}
 			return
 		}
 
@@ -473,10 +572,13 @@ func SRANGE(c *storage.Cache, l string, s []string) string {
 			arr = append(arr, v[i])
 		}
 
-		result = protocol.Array(serializeList(arr))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Array(serializeList(arr)),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -492,15 +594,18 @@ Example:
 Notes:
   - Returns the number of specified values that exist in the list.
 */
-func CONTAINS(c *storage.Cache, l string, ks []string) string {
-	var result string
+func CONTAINS(c *storage.Cache, l string, ks []string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		var q int
 
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			result = protocol.Number(0)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(0),
+			}
 			return
 		}
 
@@ -508,7 +613,10 @@ func CONTAINS(c *storage.Cache, l string, ks []string) string {
 
 		s, ok := parseList(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
@@ -521,10 +629,13 @@ func CONTAINS(c *storage.Cache, l string, ks []string) string {
 			q += m[k]
 		}
 
-		result = protocol.Number(q)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(q),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -538,20 +649,23 @@ Example:
 
   - Pattern: LCONTAINS LIST_NAME "VALUE_1" "VALUE_2"
 
-  - Result: [1, 0]
+  - res: [1, 0]
 
 Notes:
   - Returns an array of 1s and 0s, where 1 indicates the value exists and 0 indicates it does not.
 */
-func LCONTAINS(c *storage.Cache, l string, ks []string) string {
-	var result string
+func LCONTAINS(c *storage.Cache, l string, ks []string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		arr := make([]string, len(ks))
 
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			result = protocol.Array("[]")
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array("[]"),
+			}
 			return
 		}
 
@@ -559,7 +673,10 @@ func LCONTAINS(c *storage.Cache, l string, ks []string) string {
 
 		s, ok := parseList(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
@@ -576,10 +693,13 @@ func LCONTAINS(c *storage.Cache, l string, ks []string) string {
 			}
 		}
 
-		result = protocol.Array(serializeList(arr))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Array(serializeList(arr)),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -596,13 +716,16 @@ Notes:
   - Returns the index as an integer.
   - Returns -1 if the value is not found in the list.
 */
-func INDEXOF(c *storage.Cache, l, k string) string {
-	var result string
+func INDEXOF(c *storage.Cache, l, k string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(l)
 		if !exists {
-			result = protocol.Number(-1)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(-1),
+			}
 			return
 		}
 
@@ -610,7 +733,10 @@ func INDEXOF(c *storage.Cache, l, k string) string {
 
 		s, ok := parseList(cd.Value)
 		if !ok {
-			result = protocol.ErrMismatchType.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrMismatchType.Error(),
+			}
 			return
 		}
 
@@ -623,10 +749,13 @@ func INDEXOF(c *storage.Cache, l, k string) string {
 			}
 		}
 
-		result = protocol.Number(i)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(i),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -640,32 +769,41 @@ Example:
 
   - Pattern: HLEN LIST_NAME
 
-  - Result: 2
+  - res: 2
 
 Notes:
 
   - Returns the number of all values that exist in the list.
 */
-func LLEN(c *storage.Cache, l string) string {
-	var result string
+func LLEN(c *storage.Cache, l string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			result = protocol.Number(-1)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(-1),
+			}
 			return
 		} else {
 			list, ok := parseList(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
-			result = protocol.Number(len(list))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(len(list)),
+			}
 		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -680,28 +818,37 @@ Example:
 Notes:
   - Returns 1 on success.
 */
-func LCLEAR(c *storage.Cache, l string) string {
-	var result string
+func LCLEAR(c *storage.Cache, l string) protocol.Response {
+	var res protocol.Response
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(l)
 
 		if !exists {
-			result = protocol.Failure()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.Failure(),
+			}
 			return
 		} else {
 			_, ok := parseList(cd.Value)
 			if !ok {
-				result = protocol.ErrMismatchType.Error()
+				res = protocol.Response{
+					Success: false,
+					Output:  protocol.ErrMismatchType.Error(),
+				}
 				return
 			}
 
 			cd.Value = serializeList([]string{})
 			cd.Requests++
 
-			result = protocol.Success()
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Success(),
+			}
 		}
 	})
 
-	return result
+	return res
 }

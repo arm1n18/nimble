@@ -33,7 +33,7 @@ func CreateConfig() *Config {
 	c.Host = *flag.String("host", "localhost", "Server host")
 	c.Port = *flag.Int("port", 8085, "Server port")
 	m := flag.String("mode", string(ReadWrite), "Server mode")
-	usersFlag := flag.String("user", "", "Server users")
+	usersFlag := flag.String("user", "nimble:default", "Server users")
 
 	flag.Parse()
 

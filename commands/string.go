@@ -69,16 +69,20 @@ Example:
 Notes:
   - Returns OK on success.
 */
-func SET(c *storage.Cache, k, v, t string) string {
-	var result string
-
+func SET(c *storage.Cache, k, v, t string) protocol.Response {
 	pT, err := strconv.Atoi(t)
-	if err != nil {
-		return protocol.ErrInvalidTTL.Error()
+	if err != nil || pT < -1 {
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrInvalidTTL.Error(),
+		}
 	}
 
-	if pT < -1 {
-		return protocol.ErrInvalidTTL.Error()
+	if k == "" || k == "*" {
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrWrongKey.Error(),
+		}
 	}
 
 	var expiresAt *time.Time
@@ -88,11 +92,6 @@ func SET(c *storage.Cache, k, v, t string) string {
 	}
 
 	c.WithLock(func() {
-		if k == "" || k == "*" {
-			result = protocol.ErrWrongKey.Error()
-			return
-		}
-
 		c.SetUnsafe(k, &storage.CacheData{
 			Value:     v,
 			Type:      storage.String,
@@ -100,11 +99,12 @@ func SET(c *storage.Cache, k, v, t string) string {
 			CreatedAt: time.Now(),
 			ExpiresAt: expiresAt,
 		})
-
-		result = protocol.Ok()
 	})
 
-	return result
+	return protocol.Response{
+		Success: true,
+		Output:  protocol.Ok(),
+	}
 }
 
 /*
@@ -123,39 +123,44 @@ Notes:
     Use SET with expiration options or apply TTL separately after MSET.
   - Returns OK on success.
 */
-func MSET(c *storage.Cache, args ...string) string {
-	var result string
-
-	if len(args)%2 == 0 && len(args) != 0 {
-		for i := 0; i < len(args); i += 2 {
-			k, _ := args[i], args[i+1]
-
-			if k == "" || k == "*" {
-				return protocol.ErrWrongKey.Error()
-			}
+func MSET(c *storage.Cache, args ...string) protocol.Response {
+	if len(args) == 0 || len(args)%2 != 0 {
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotEnoughValues.Error(),
 		}
-
-		c.WithLock(func() {
-
-			for i := 0; i < len(args); i += 2 {
-				k, v := args[i], args[i+1]
-
-				c.SetUnsafe(k, &storage.CacheData{
-					Value:     v,
-					Type:      storage.String,
-					Requests:  1,
-					CreatedAt: time.Now(),
-				})
-			}
-
-			result = protocol.Ok()
-		})
-	} else {
-		result = protocol.ErrNotEnoughValues.Error()
-		return result
 	}
 
-	return result
+	for i := 0; i < len(args); i += 2 {
+		k := args[i]
+
+		if k == "" || k == "*" {
+			return protocol.Response{
+				Success: false,
+				Output:  protocol.ErrWrongKey.Error(),
+			}
+		}
+	}
+
+	c.WithLock(func() {
+		now := time.Now()
+
+		for i := 0; i < len(args); i += 2 {
+			k, v := args[i], args[i+1]
+
+			c.SetUnsafe(k, &storage.CacheData{
+				Value:     v,
+				Type:      storage.String,
+				Requests:  1,
+				CreatedAt: now,
+			})
+		}
+	})
+
+	return protocol.Response{
+		Success: true,
+		Output:  protocol.Ok(),
+	}
 }
 
 /*
@@ -171,21 +176,26 @@ Example:
 Notes:
   - Returns the value of the key as a string, or null if the key does not exist.
 */
-func GET(c *storage.Cache, k string) string {
-	var result string
+func GET(c *storage.Cache, k string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		if cd, exists := c.GetUnsafe(k); exists {
 			cd.Requests++
-			result = protocol.String(cd.Value)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.String(cd.Value),
+			}
 			return
-		} else {
-			result = protocol.Nil()
-			return
+		}
+
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Nil(),
 		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -201,11 +211,11 @@ Example:
 Notes:
   - Returns an array of values or nulls.
 */
-func MGET(c *storage.Cache, args ...string) string {
-	var result string
+func MGET(c *storage.Cache, args ...string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
-		var arr []string
+		arr := make([]string, 0, len(args))
 
 		for _, k := range args {
 			if cd, exists := c.GetUnsafe(k); exists {
@@ -216,8 +226,11 @@ func MGET(c *storage.Cache, args ...string) string {
 			}
 		}
 
-		result = protocol.Array(serializeList(arr))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Array(serializeList(arr)),
+		}
 	})
 
-	return result
+	return res
 }

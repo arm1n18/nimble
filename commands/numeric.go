@@ -39,8 +39,8 @@ Notes:
   - Returns the new value after incrementing.
   - If the key does not exist, it is set to 0 before incrementing.
 */
-func INCR(c *storage.Cache, k string) string {
-	var result string
+func INCR(c *storage.Cache, k string) protocol.Response {
+	var res protocol.Response
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(k)
@@ -51,13 +51,19 @@ func INCR(c *storage.Cache, k string) string {
 				Type:      storage.String,
 				CreatedAt: time.Now(),
 			})
-			result = protocol.Number(1)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(1),
+			}
 			return
 		}
 
 		cv, ok := parseFloat(cd.Value)
 		if !ok {
-			result = protocol.ErrNotANumber.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrNotANumber.Error(),
+			}
 			return
 		}
 
@@ -65,10 +71,13 @@ func INCR(c *storage.Cache, k string) string {
 		cd.Value = serializeFloat(calc)
 		cd.Requests++
 
-		result = protocol.Number(calc)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(calc),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -88,8 +97,8 @@ Notes:
   - Returns the new value after decrementing.
   - If the key does not exist, it is set to 0 before decrementing.
 */
-func DECR(c *storage.Cache, k string) string {
-	var result string
+func DECR(c *storage.Cache, k string) protocol.Response {
+	var res protocol.Response
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(k)
@@ -100,13 +109,19 @@ func DECR(c *storage.Cache, k string) string {
 				Type:      storage.String,
 				CreatedAt: time.Now(),
 			})
-			result = protocol.Number(-1)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(-1),
+			}
 			return
 		}
 
 		cv, ok := parseFloat(cd.Value)
 		if !ok {
-			result = protocol.ErrNotANumber.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrNotANumber.Error(),
+			}
 			return
 		}
 
@@ -114,10 +129,13 @@ func DECR(c *storage.Cache, k string) string {
 		cd.Value = serializeFloat(calc)
 		cd.Requests++
 
-		result = protocol.Number(calc)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(calc),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -137,12 +155,15 @@ Notes:
   - Returns the new value after incrementing.
   - If the key does not exist, it is set to 0 before incrementing.
 */
-func INCRBY(c *storage.Cache, k, v string) string {
-	var result string
+func INCRBY(c *storage.Cache, k, v string) protocol.Response {
+	var res protocol.Response
 
 	f, ok := parseFloat(v)
 	if !ok {
-		return protocol.ErrMismatchType.Error()
+		res = protocol.Response{
+			Success: false,
+			Output:  protocol.ErrMismatchType.Error(),
+		}
 	}
 
 	c.WithLock(func() {
@@ -154,13 +175,19 @@ func INCRBY(c *storage.Cache, k, v string) string {
 				Type:      storage.String,
 				CreatedAt: time.Now(),
 			})
-			result = protocol.Number(f)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(f),
+			}
 			return
 		}
 
 		cv, ok := parseFloat(cd.Value)
 		if !ok {
-			result = protocol.ErrNotANumber.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrNotANumber.Error(),
+			}
 			return
 		}
 
@@ -168,10 +195,13 @@ func INCRBY(c *storage.Cache, k, v string) string {
 		cd.Value = serializeFloat(calc)
 		cd.Requests++
 
-		result = protocol.Number(calc)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(calc),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -191,12 +221,15 @@ Notes:
   - Returns the new value after decrementing.
   - If the key does not exist, it is set to 0 before decrementing.
 */
-func DECRBY(c *storage.Cache, k, v string) string {
-	var result string
+func DECRBY(c *storage.Cache, k, v string) protocol.Response {
+	var res protocol.Response
 
 	f, ok := parseFloat(v)
 	if !ok {
-		return protocol.ErrMismatchType.Error()
+		res = protocol.Response{
+			Success: false,
+			Output:  protocol.ErrMismatchType.Error(),
+		}
 	}
 
 	c.WithLock(func() {
@@ -208,13 +241,19 @@ func DECRBY(c *storage.Cache, k, v string) string {
 				Type:      storage.String,
 				CreatedAt: time.Now(),
 			})
-			result = protocol.Number(f * -1)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(f * -1),
+			}
 			return
 		}
 
 		cv, ok := parseFloat(cd.Value)
 		if !ok {
-			result = protocol.ErrNotANumber.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrNotANumber.Error(),
+			}
 			return
 		}
 
@@ -222,10 +261,13 @@ func DECRBY(c *storage.Cache, k, v string) string {
 		cd.Value = serializeFloat(calc)
 		cd.Requests++
 
-		result = protocol.Number(calc)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(calc),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -245,12 +287,15 @@ Notes:
   - Returns the new value after multiplication.
   - If the key does not exist, it is set to 0.
 */
-func MUL(c *storage.Cache, k, v string) string {
-	var result string
+func MUL(c *storage.Cache, k, v string) protocol.Response {
+	var res protocol.Response
 
 	f, ok := parseFloat(v)
 	if !ok {
-		return protocol.ErrMismatchType.Error()
+		res = protocol.Response{
+			Success: false,
+			Output:  protocol.ErrMismatchType.Error(),
+		}
 	}
 
 	c.WithLock(func() {
@@ -262,13 +307,19 @@ func MUL(c *storage.Cache, k, v string) string {
 				Type:      storage.String,
 				CreatedAt: time.Now(),
 			})
-			result = protocol.Number(0)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(0),
+			}
 			return
 		}
 
 		cv, ok := parseFloat(cd.Value)
 		if !ok {
-			result = protocol.ErrNotANumber.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrNotANumber.Error(),
+			}
 			return
 		}
 
@@ -276,10 +327,13 @@ func MUL(c *storage.Cache, k, v string) string {
 		cd.Value = serializeFloat(calc)
 		cd.Requests++
 
-		result = protocol.Number(calc)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(calc),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -299,12 +353,22 @@ Notes:
   - Returns the new value after division.
   - If the key does not exist, it is set to 0.
 */
-func DIV(c *storage.Cache, k, v string) string {
-	var result string
+func DIV(c *storage.Cache, k, v string) protocol.Response {
+	var res protocol.Response
 
 	f, ok := parseFloat(v)
 	if !ok {
-		return protocol.ErrMismatchType.Error()
+		res = protocol.Response{
+			Success: false,
+			Output:  protocol.ErrMismatchType.Error(),
+		}
+	}
+
+	if f == 0 {
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrorMessage("Division by zero is not allowed"),
+		}
 	}
 
 	c.WithLock(func() {
@@ -316,13 +380,19 @@ func DIV(c *storage.Cache, k, v string) string {
 				Type:      storage.String,
 				CreatedAt: time.Now(),
 			})
-			result = protocol.Number(0)
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Number(0),
+			}
 			return
 		}
 
 		cv, ok := parseFloat(cd.Value)
 		if !ok {
-			result = protocol.ErrNotANumber.Error()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrNotANumber.Error(),
+			}
 			return
 		}
 
@@ -330,8 +400,11 @@ func DIV(c *storage.Cache, k, v string) string {
 		cd.Value = serializeFloat(calc)
 		cd.Requests++
 
-		result = protocol.Number(calc)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(calc),
+		}
 	})
 
-	return result
+	return res
 }

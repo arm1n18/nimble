@@ -20,17 +20,20 @@ Example:
 
   - Pattern: DEL KEY_1 KEY_2
 
-  - Result: 2
+  - res: 2
 
 Notes:
   - Returns the number of keys that were deleted.
 */
-func DEL(c *storage.Cache, args ...string) string {
-	var result string
+func DEL(c *storage.Cache, args ...string) protocol.Response {
+	var res protocol.Response
 	var q int
 
 	if len(args) == 0 {
-		return protocol.ErrNotEnoughValues.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrNotEnoughValues.Error(),
+		}
 	}
 
 	if len(args) == 1 && args[0] == "*" {
@@ -40,7 +43,10 @@ func DEL(c *storage.Cache, args ...string) string {
 		})
 
 		c.ResetCache()
-		return protocol.Number(q)
+		return protocol.Response{
+			Success: true,
+			Output:  protocol.Number(q),
+		}
 	}
 
 	c.WithLock(func() {
@@ -51,10 +57,13 @@ func DEL(c *storage.Cache, args ...string) string {
 			}
 		}
 
-		result = protocol.Number(q)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(q),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -72,26 +81,35 @@ Notes:
   - If target_key doesn't exist, it will be created.
   - Returns OK on success.
 */
-func COPY(c *storage.Cache, f, t string) string {
-	var result string
+func COPY(c *storage.Cache, f, t string) protocol.Response {
+	var res protocol.Response
 
 	if len(f) == 0 || len(t) == 0 || f == "*" || t == "*" {
-		return protocol.ErrWrongKey.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrWrongKey.Error(),
+		}
 	}
 
 	c.WithLock(func() {
 		cd, exists := c.GetUnsafe(f)
 		if !exists {
-			result = protocol.Failure()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.Failure(),
+			}
 			return
 		}
 
 		c.SetPartialUnsafe(t, storage.CacheDataUpdate{Value: &cd.Value, Type: &cd.Type})
 
-		result = protocol.Success()
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Success(),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -105,13 +123,13 @@ Example:
 
   - Pattern: LIST
 
-  - Result: [KEY_1, KEY_2]
+  - res: [KEY_1, KEY_2]
 
 Notes:
   - Returns an array of all keys that exist.
 */
-func LIST(c *storage.Cache) string {
-	var result string
+func LIST(c *storage.Cache) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		cd := c.GetUnsafeData()
@@ -121,10 +139,13 @@ func LIST(c *storage.Cache) string {
 			arr = append(arr, k)
 		}
 
-		result = protocol.Array(serializeList(arr))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Array(serializeList(arr)),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -138,19 +159,22 @@ Example:
 
   - Pattern: LISTLEN
 
-  - Result: 2
+  - res: 2
 
 Notes:
   - Returns the number of all keys that exist.
 */
-func LISTLEN(c *storage.Cache) string {
-	var result string
+func LISTLEN(c *storage.Cache) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
-		result = protocol.Number(len(c.GetUnsafeData()))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(len(c.GetUnsafeData())),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -164,15 +188,15 @@ Example:
 
   - Pattern: EXISTS KEY_1 KEY_2 KEY_0
 
-  - Result: 2
+  - res: 2
 
   - Explanation: (KEY_1 exists, KEY_2 exists, KEY_0 does not exist)
 
 Notes:
   - Returns the number of specified keys that exist.
 */
-func EXISTS(c *storage.Cache, args ...string) string {
-	var result string
+func EXISTS(c *storage.Cache, args ...string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		var q int
@@ -184,10 +208,13 @@ func EXISTS(c *storage.Cache, args ...string) string {
 			}
 		}
 
-		result = protocol.Number(q)
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Number(q),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -206,15 +233,15 @@ Example:
 
   - Pattern: LEXISTS KEY_1 KEY_2 KEY_0
 
-  - Result: [1, 1, 0]
+  - res: [1, 1, 0]
 
   - Explanation: (KEY_1 exists, KEY_2 exists, KEY_0 does not exist)
 
 Notes:
   - Returns an array of 1s and 0s, where 1 indicates the key exists and 0 indicates it does not.
 */
-func LEXISTS(c *storage.Cache, args ...string) string {
-	var result string
+func LEXISTS(c *storage.Cache, args ...string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		arr := make([]string, len(args))
@@ -228,10 +255,13 @@ func LEXISTS(c *storage.Cache, args ...string) string {
 			}
 		}
 
-		result = protocol.Array(serializeList(arr))
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Array(serializeList(arr)),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -243,7 +273,7 @@ Get keys from cache by pattern.
 
   - Pattern: KEYS user:*
 
-  - Result: [user:1, user:123, user:ABC]
+  - res: [user:1, user:123, user:ABC]
 
 2. Pattern '?'
 
@@ -251,16 +281,19 @@ Get keys from cache by pattern.
 
   - Pattern: KEYS user:???
 
-  - Result: [user:123, user:256, user:ABC]
+  - res: [user:123, user:256, user:ABC]
 
 Notes:
   - Returns an array of keys matching the pattern.
 */
-func KEYS(c *storage.Cache, args ...string) string {
-	var result string
+func KEYS(c *storage.Cache, args ...string) protocol.Response {
+	var res protocol.Response
 
 	if len(args) == 0 || len(args) == 2 || len(args) > 3 {
-		return protocol.ErrInvalidSyntax.Error()
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrInvalidSyntax.Error(),
+		}
 	}
 
 	d := -1
@@ -270,20 +303,29 @@ func KEYS(c *storage.Cache, args ...string) string {
 			var err error
 			d, err = strconv.Atoi(args[2])
 			if err != nil {
-				return protocol.ErrNotANumber.Error()
+				return protocol.Response{
+					Success: false,
+					Output:  protocol.ErrNotANumber.Error(),
+				}
 			}
 		} else {
-			return protocol.ErrInvalidSyntax.Error()
+			return protocol.Response{
+				Success: false,
+				Output:  protocol.ErrInvalidSyntax.Error(),
+			}
 		}
 	}
 
 	if parser.IsPatternCmd(args[0]) {
 		c.WithRWLock(func() {
-			result = protocol.Array(serializeList(getKeysByPattern(c.GetUnsafeData(), args[0], d)))
+			res = protocol.Response{
+				Success: true,
+				Output:  protocol.Array(serializeList(getKeysByPattern(c.GetUnsafeData(), args[0], d))),
+			}
 		})
 	}
 
-	return result
+	return res
 }
 
 /*
@@ -299,19 +341,25 @@ Example:
 Notes:
   - Returns 1 on success.
 */
-func RENAME(c *storage.Cache, f, t string) string {
-	var result string
+func RENAME(c *storage.Cache, f, t string) protocol.Response {
+	var res protocol.Response
 
 	c.WithLock(func() {
 		sCd, exists := c.GetUnsafe(f)
 		if !exists {
-			result = protocol.Failure()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.Failure(),
+			}
 			return
 		}
 
 		_, exists = c.GetUnsafe(t)
 		if exists {
-			result = protocol.Failure()
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.Failure(),
+			}
 			return
 		}
 
@@ -320,10 +368,13 @@ func RENAME(c *storage.Cache, f, t string) string {
 		delete(d, f)
 		c.SetUnsafe(t, sCd)
 
-		result = protocol.Success()
+		res = protocol.Response{
+			Success: true,
+			Output:  protocol.Success(),
+		}
 	})
 
-	return result
+	return res
 }
 
 /*
@@ -339,18 +390,24 @@ Example:
 Notes:
   - Returns the data type as a string.
 */
-func TYPE(c *storage.Cache, k string) string {
-	var result string
+func TYPE(c *storage.Cache, k string) protocol.Response {
+	var res protocol.Response
 
 	c.WithRWLock(func() {
 		cd, exists := c.GetUnsafe(k)
 		if !exists {
-			result = protocol.ErrorMessage("Can`t find %v in memory", k)
+			res = protocol.Response{
+				Success: false,
+				Output:  protocol.ErrorMessage("Can`t find %v in memory", k),
+			}
 			return
 		}
 
-		result = string(cd.Type)
+		res = protocol.Response{
+			Success: true,
+			Output:  string(cd.Type),
+		}
 	})
 
-	return result
+	return res
 }

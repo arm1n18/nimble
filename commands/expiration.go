@@ -21,16 +21,17 @@ Example:
 
   - Explanation: Sets the key "session:123" to expire in 360 seconds (6 minutes)
 */
-func TTK(c *storage.Cache, k, v string) string {
-	var result string
-
-	t, err := strconv.Atoi(v)
-	if err != nil {
-		return protocol.ErrInvalidTTL.Error()
+func TTK(c *storage.Cache, k, v string) protocol.Response {
+	result := protocol.Response{
+		Success: true,
 	}
 
-	if t < -1 {
-		return protocol.ErrInvalidTTL.Error()
+	t, err := strconv.Atoi(v)
+	if err != nil || t < -1 {
+		return protocol.Response{
+			Success: false,
+			Output:  protocol.ErrInvalidTTL.Error(),
+		}
 	}
 
 	var expiresAt *time.Time
@@ -40,20 +41,22 @@ func TTK(c *storage.Cache, k, v string) string {
 	}
 
 	c.WithLock(func() {
-
 		if k == "*" {
 			for key := range c.GetUnsafeData() {
 				c.SetPartialUnsafe(key, storage.CacheDataUpdate{
 					ExpiresAt: expiresAt,
 				})
 			}
-			result = protocol.Success()
+			result.Output = protocol.Success()
 			return
 		}
 
 		_, exists := c.GetUnsafe(k)
 		if !exists {
-			result = protocol.Failure()
+			result = protocol.Response{
+				Success: false,
+				Output:  protocol.Failure(),
+			}
 			return
 		}
 
@@ -61,7 +64,7 @@ func TTK(c *storage.Cache, k, v string) string {
 			ExpiresAt: expiresAt,
 		})
 
-		result = protocol.Success()
+		result.Output = protocol.Success()
 	})
 
 	return result
@@ -86,19 +89,20 @@ Notes:
   - If the key exists but has no expiration, returns -1
   - If the key doesn`t exist, returns -2
 */
-func TTL(c *storage.Cache, k string) string {
-	var result string
+func TTL(c *storage.Cache, k string) protocol.Response {
+	result := protocol.Response{
+		Success: true,
+	}
 
 	c.WithRWLock(func() {
-
 		if dataCache, exists := c.GetSafe(k); exists {
 			if dataCache.ExpiresAt == nil {
-				result = "-1"
+				result.Output = "-1"
 				return
 			}
-			result = protocol.Number(int(time.Until(*dataCache.ExpiresAt).Seconds()))
+			result.Output = protocol.Number(int(time.Until(*dataCache.ExpiresAt).Seconds()))
 		} else {
-			result = "-2"
+			result.Output = "-2"
 			return
 		}
 	})
