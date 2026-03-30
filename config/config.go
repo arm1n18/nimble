@@ -33,7 +33,7 @@ func CreateConfig() *Config {
 
 	c.Host = *flag.String("host", "localhost", "Server host")
 	c.Port = *flag.Int("port", 8085, "Server port")
-	c.MaxHistory = *flag.Int("historyLimit", 1000, "Max server history")
+	c.MaxHistory = *flag.Int("hLim", 1000, "Max server history")
 	m := flag.String("mode", string(ReadWrite), "Server mode")
 	usersFlag := flag.String("user", "nimble:default", "Server users")
 
