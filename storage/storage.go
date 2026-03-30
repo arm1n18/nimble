@@ -31,14 +31,26 @@ type CacheData struct {
 	ExpiresAt *time.Time
 }
 
+type History struct {
+	Command   string
+	Timestamp time.Time
+}
+
 type Cache struct {
 	data map[string]*CacheData
 	mu   sync.RWMutex
+
+	maxHistory   int
+	history      []History
+	historyIndex map[string][]int
 }
 
-func CreateCache() *Cache {
+func CreateCache(mH int) *Cache {
 	return &Cache{
-		data: make(map[string]*CacheData),
+		data:         make(map[string]*CacheData),
+		history:      make([]History, 0),
+		historyIndex: make(map[string][]int),
+		maxHistory:   mH,
 	}
 }
 
@@ -131,4 +143,85 @@ func (c *Cache) BGGC(interval time.Duration) {
 			})
 		}
 	}()
+}
+
+func (c *Cache) AddToHistory(k, cmd string) {
+	c.WithLock(func() {
+		c.history = append(c.history, History{
+			Command:   cmd,
+			Timestamp: time.Now(),
+		})
+
+		c.historyIndex[k] = append(c.historyIndex[k], len(c.history)-1)
+
+		if len(c.history) > c.maxHistory {
+			dif := len(c.history) - c.maxHistory
+			c.history = c.history[dif:]
+
+			for k, indexes := range c.historyIndex {
+				newIndexes := make([]int, 0, len(indexes))
+				for _, i := range indexes {
+					i -= dif
+					if i >= 0 {
+						newIndexes = append(newIndexes, i)
+					}
+				}
+
+				if len(newIndexes) == 0 {
+					delete(c.historyIndex, k)
+				} else {
+					c.historyIndex[k] = newIndexes
+				}
+			}
+		}
+	})
+}
+
+func (c *Cache) GetKeyHistory(k string) []History {
+	var res []History
+
+	c.WithRWLock(func() {
+		indexes, exists := c.historyIndex[k]
+		if !exists || len(indexes) == 0 {
+			res = nil
+			return
+		}
+
+		history := make([]History, len(indexes))
+		for i, index := range indexes {
+			history[i] = c.history[index]
+		}
+
+		res = history
+	})
+
+	return res
+}
+
+func (c *Cache) GetHistory() []History {
+	var res []History
+
+	c.WithRWLock(func() {
+		for _, h := range c.history {
+			res = append(res, h)
+		}
+	})
+
+	return res
+}
+
+func (c *Cache) GetHistoryUntil(t time.Time) []History {
+	var res []History
+
+	c.WithRWLock(func() {
+		for _, h := range c.history {
+			if !h.Timestamp.After(t) {
+				res = append(res, h)
+			} else {
+				break
+			}
+		}
+	})
+
+	return res
 }

@@ -34,7 +34,7 @@ func registerServer(conf *config.Config) {
 
 	defer l.Close()
 
-	s := storage.CreateCache()
+	s := storage.CreateCache(conf.MaxHistory)
 
 	go s.BGGC(5 * time.Second)
 
@@ -122,7 +122,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.SET(s, cmdArgs[0], cmdArgs[1], cmdArgs[2])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -139,7 +139,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.MSET(s, cmdArgs...)
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -155,7 +155,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.GET(s, cmdArgs[0])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -170,7 +170,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.MGET(s, cmdArgs...)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -181,7 +181,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.KEYS(s, cmdArgs...)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -197,7 +197,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.HSET(s, cmdArgs[0], cmdArgs[1:]...)
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -213,7 +213,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.HGET(s, cmdArgs[0], cmdArgs[1:]...)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -228,7 +228,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.HDEL(s, cmdArgs[0], cmdArgs[1:]...)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -243,7 +243,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.HLEN(s, cmdArgs[0])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -258,7 +258,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.HKEYS(s, cmdArgs[0])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -273,7 +273,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.HVALUES(s, cmdArgs[0])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -289,7 +289,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.DEL(s, cmdArgs...)
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -306,7 +306,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.COPY(s, cmdArgs[0], cmdArgs[1])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -323,7 +323,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.RENAME(s, cmdArgs[0], cmdArgs[1])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -340,7 +340,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.ESET(s, cmdArgs[0])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -357,7 +357,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.LSET(s, cmdArgs[0], cmdArgs[1:]...)
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -373,7 +373,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.LGET(s, cmdArgs[0], cmdArgs[1:]...)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -388,7 +388,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.LCLEAR(s, cmdArgs[0])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -399,7 +399,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.LLEN(s, cmdArgs[0])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -415,7 +415,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.SPUSH(s, cmdArgs[0], cmdArgs[1:]...)
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -432,7 +432,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.EPUSH(s, cmdArgs[0], cmdArgs[1:]...)
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -452,7 +452,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.SPOP(s, cmdArgs[0], cmdArgs[1])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -472,7 +472,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.EPOP(s, cmdArgs[0], cmdArgs[1])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -488,7 +488,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.SRANGE(s, cmdArgs[0], cmdArgs[1:])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -504,7 +504,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.SADD(s, cmdArgs[0], cmdArgs[1:]...)
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -521,7 +521,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.SREM(s, cmdArgs[0], cmdArgs[1:]...)
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -537,7 +537,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.SLEN(s, cmdArgs[0])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -552,7 +552,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.SMEMBERS(s, cmdArgs[0])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -567,7 +567,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.ZADD(s, cmdArgs[0], cmdArgs[1], cmdArgs[2])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -582,7 +582,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.ZREM(s, cmdArgs[0], cmdArgs[1])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -597,7 +597,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.ZRANGE(s, cmdArgs[0], cmdArgs[1], cmdArgs[2])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -612,7 +612,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.SCORE(s, cmdArgs[0], cmdArgs[1])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -627,7 +627,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.LSCORE(s, cmdArgs[0], cmdArgs[1:]...)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -643,7 +643,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.TTK(s, cmdArgs[0], cmdArgs[1])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -659,21 +659,21 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.TTL(s, cmdArgs[0])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
 	case "LIST":
 		resp := cmd.LIST(s)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
 	case "LISTLEN":
 		resp := cmd.LISTLEN(s)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -689,7 +689,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.INCR(s, cmdArgs[0])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -706,7 +706,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.DECR(s, cmdArgs[0])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -723,7 +723,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.INCRBY(s, cmdArgs[0], cmdArgs[1])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -740,7 +740,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.DECRBY(s, cmdArgs[0], cmdArgs[1])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -757,7 +757,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.MUL(s, cmdArgs[0], cmdArgs[1])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -774,7 +774,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 		return conf.ReadOnlyMiddleware(func() string {
 			resp := cmd.DIV(s, cmdArgs[0], cmdArgs[1])
 			if resp.Success {
-				// add cmd to stack
+				s.AddToHistory(cmdArgs[0], line)
 			}
 
 			return resp.Output
@@ -790,7 +790,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.EXISTS(s, cmdArgs...)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -805,7 +805,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.LEXISTS(s, cmdArgs...)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -820,7 +820,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.HCONTAINS(s, cmdArgs[0], cmdArgs[1:]...)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -835,7 +835,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.LHCONTAINS(s, cmdArgs[0], cmdArgs[1:]...)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -850,7 +850,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.CONTAINS(s, cmdArgs[0], cmdArgs[1:])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -865,7 +865,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.LCONTAINS(s, cmdArgs[0], cmdArgs[1:])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -880,7 +880,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.SCONTAINS(s, cmdArgs[0], cmdArgs[1:]...)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -895,7 +895,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.LSCONTAINS(s, cmdArgs[0], cmdArgs[1:]...)
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -910,7 +910,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.INDEXOF(s, cmdArgs[0], cmdArgs[1])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
@@ -925,7 +925,7 @@ func handleCommand(s *storage.Cache, session *Session, conf *config.Config, line
 
 		resp := cmd.TYPE(s, cmdArgs[0])
 		if resp.Success {
-			// add cmd to stack
+			s.AddToHistory(cmdArgs[0], line)
 		}
 
 		return resp.Output
